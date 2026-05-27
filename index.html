@@ -1,0 +1,2639 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>BD/Hindu College Welimada — Attendance System</title>
+
+<!-- Google Fonts -->
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;500;600;700;800;900&family=Poppins:wght@300;400;500;600;700;800&display=swap" rel="stylesheet"/>
+<!-- Font Awesome -->
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css"/>
+<!-- Chart.js -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+
+<!-- ============================================================
+     FIREBASE SDK  (Firestore only — no Auth billing)
+     ============================================================ -->
+<script type="module">
+  // ╔══════════════════════════════════════════════════════════════════╗
+  // ║  ⚙️  PASTE YOUR FIREBASE CONFIG HERE (Firestore data only)      ║
+  // ║  1. Go to https://console.firebase.google.com                   ║
+  // ║  2. Create / select your project                                ║
+  // ║  3. Project Settings → Your Apps → Web → Copy firebaseConfig    ║
+  // ║  4. Enable Firestore Database (test mode is fine)               ║
+  // ║  NOTE: Firebase Authentication is NOT required / NOT used       ║
+  // ╚══════════════════════════════════════════════════════════════════╝
+  const firebaseConfig = {
+    apiKey:            "PASTE_YOUR_API_KEY_HERE",
+    authDomain:        "PASTE_YOUR_AUTH_DOMAIN_HERE",
+    projectId:         "PASTE_YOUR_PROJECT_ID_HERE",
+    storageBucket:     "PASTE_YOUR_STORAGE_BUCKET_HERE",
+    messagingSenderId: "PASTE_YOUR_MESSAGING_SENDER_ID_HERE",
+    appId:             "PASTE_YOUR_APP_ID_HERE"
+  };
+
+  import { initializeApp }          from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+  import { getFirestore, doc, getDoc, setDoc,
+           updateDoc, deleteDoc, collection,
+           getDocs, addDoc, query, where,
+           orderBy, onSnapshot, serverTimestamp,
+           Timestamp }               from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+  // ── Init ──────────────────────────────────────────────────────────
+  const app = initializeApp(firebaseConfig);
+  const db  = getFirestore(app);
+
+  // ── Expose Firestore helpers to window ────────────────────────────
+  window.FB = { db, doc, getDoc, setDoc, updateDoc, deleteDoc,
+    collection, getDocs, addDoc, query, where, orderBy, onSnapshot,
+    serverTimestamp, Timestamp };
+
+  window.dispatchEvent(new Event("firebaseReady"));
+</script>
+
+<!-- ============================================================
+     LOCAL AUTH SYSTEM  (no Firebase Auth — no billing)
+     Login credentials stored in localStorage.
+     Default principal: principal@whc.lk / principal@1221
+     ============================================================ -->
+<script>
+  // ── Default principal credentials (editable from Settings) ────────
+  const DEFAULT_PRINCIPAL = {
+    username: "principal@whc.lk",
+    password: "principal@1221",
+    name: "Principal",
+    role: "principal"
+  };
+
+  window.AUTH = {
+    // Returns stored principal creds or defaults
+    getPrincipal() {
+      const stored = localStorage.getItem("whc_principal");
+      return stored ? JSON.parse(stored) : { ...DEFAULT_PRINCIPAL };
+    },
+    savePrincipal(data) {
+      localStorage.setItem("whc_principal", JSON.stringify(data));
+    },
+    // Teacher accounts list
+    getTeachers() {
+      const stored = localStorage.getItem("whc_teachers");
+      return stored ? JSON.parse(stored) : [];
+    },
+    saveTeachers(list) {
+      localStorage.setItem("whc_teachers", JSON.stringify(list));
+    },
+    // Session
+    getSession() {
+      const s = sessionStorage.getItem("whc_session");
+      return s ? JSON.parse(s) : null;
+    },
+    setSession(user) {
+      sessionStorage.setItem("whc_session", JSON.stringify(user));
+    },
+    clearSession() {
+      sessionStorage.removeItem("whc_session");
+    },
+    // Login check
+    login(username, password) {
+      const principal = this.getPrincipal();
+      if (username === principal.username && password === principal.password) {
+        const user = { id: "principal", role: "principal", name: principal.name, email: username };
+        this.setSession(user);
+        return user;
+      }
+      const teachers = this.getTeachers();
+      const teacher = teachers.find(t => t.username === username && t.password === password);
+      if (teacher) {
+        const user = { id: teacher.id, role: "teacher", name: teacher.name, email: teacher.username,
+          permissions: teacher.permissions || {}, assignedClasses: teacher.assignedClasses || [] };
+        this.setSession(user);
+        return user;
+      }
+      return null;
+    }
+  };
+</script>
+
+<style>
+/* ================================================================
+   RESET & ROOT VARIABLES
+   ================================================================ */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --blue-dark:   #0a1628;
+  --blue-mid:    #0d2147;
+  --blue-main:   #1a3a8f;
+  --blue-light:  #2563eb;
+  --blue-accent: #3b82f6;
+  --cyan:        #06b6d4;
+  --sky:         #38bdf8;
+  --white:       #ffffff;
+  --glass-bg:    rgba(255,255,255,0.07);
+  --glass-border:rgba(255,255,255,0.15);
+  --text-main:   #e2e8f0;
+  --text-muted:  #94a3b8;
+  --text-dark:   #1e293b;
+  --success:     #10b981;
+  --warning:     #f59e0b;
+  --danger:      #ef4444;
+  --late:        #f97316;
+  --card-radius: 18px;
+  --sidebar-w:   260px;
+  --transition:  all .3s cubic-bezier(.4,0,.2,1);
+}
+
+body {
+  font-family: 'Nunito', sans-serif;
+  background: var(--blue-dark);
+  color: var(--text-main);
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+/* ── Background mesh ─────────────────────────────────────────────── */
+body::before {
+  content: '';
+  position: fixed; inset: 0; z-index: -1;
+  background:
+    radial-gradient(ellipse 80% 60% at 20% 10%, rgba(37,99,235,.35) 0%, transparent 60%),
+    radial-gradient(ellipse 60% 50% at 80% 80%, rgba(6,182,212,.25) 0%, transparent 60%),
+    linear-gradient(160deg, #0a1628 0%, #0d2147 50%, #0f172a 100%);
+}
+
+/* ── Scrollbar ───────────────────────────────────────────────────── */
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--blue-accent); border-radius: 3px; }
+
+/* ================================================================
+   UTILITY
+   ================================================================ */
+.hidden   { display: none !important; }
+.flex     { display: flex; }
+.items-center { align-items: center; }
+.gap-2    { gap: .5rem; }
+.gap-3    { gap: .75rem; }
+.gap-4    { gap: 1rem; }
+.mt-2     { margin-top: .5rem; }
+.mt-4     { margin-top: 1rem; }
+.mb-4     { margin-bottom: 1rem; }
+.w-full   { width: 100%; }
+.text-sm  { font-size: .85rem; }
+.text-xs  { font-size: .75rem; }
+.font-bold{ font-weight: 700; }
+.text-center { text-align: center; }
+
+/* ── Glass card ──────────────────────────────────────────────────── */
+.glass {
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border-radius: var(--card-radius);
+}
+
+/* ── Buttons ─────────────────────────────────────────────────────── */
+.btn {
+  display: inline-flex; align-items: center; gap: .45rem;
+  padding: .6rem 1.3rem; border: none; cursor: pointer;
+  border-radius: 10px; font-family: 'Nunito', sans-serif;
+  font-size: .9rem; font-weight: 700; transition: var(--transition);
+  white-space: nowrap;
+}
+.btn-primary {
+  background: linear-gradient(135deg, var(--blue-light), var(--blue-accent));
+  color: #fff; box-shadow: 0 4px 20px rgba(37,99,235,.45);
+}
+.btn-primary:hover { transform: translateY(-2px); box-shadow: 0 8px 28px rgba(37,99,235,.6); }
+.btn-success { background: linear-gradient(135deg, #059669, var(--success)); color:#fff; }
+.btn-success:hover { transform: translateY(-2px); }
+.btn-danger  { background: linear-gradient(135deg, #dc2626, var(--danger)); color:#fff; }
+.btn-danger:hover { transform: translateY(-2px); }
+.btn-warning { background: linear-gradient(135deg, #d97706, var(--warning)); color:#fff; }
+.btn-outline {
+  background: transparent; color: var(--text-main);
+  border: 1px solid var(--glass-border);
+}
+.btn-outline:hover { background: var(--glass-bg); }
+.btn-sm { padding: .4rem .9rem; font-size: .8rem; border-radius: 8px; }
+.btn-icon { padding: .5rem; border-radius: 8px; aspect-ratio: 1; justify-content: center; }
+
+/* ── Inputs ──────────────────────────────────────────────────────── */
+.input-group { display: flex; flex-direction: column; gap: .35rem; margin-bottom: 1rem; }
+.input-group label { font-size: .82rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: .05em; }
+.form-control {
+  background: rgba(255,255,255,0.06);
+  border: 1px solid var(--glass-border);
+  color: var(--text-main); border-radius: 10px;
+  padding: .65rem 1rem; font-family: 'Nunito', sans-serif;
+  font-size: .9rem; transition: var(--transition); width: 100%;
+}
+.form-control:focus { outline: none; border-color: var(--blue-accent); background: rgba(255,255,255,0.1); box-shadow: 0 0 0 3px rgba(59,130,246,.25); }
+.form-control option { background: var(--blue-mid); }
+select.form-control { cursor: pointer; }
+
+/* ── Badge ───────────────────────────────────────────────────────── */
+.badge {
+  display: inline-flex; align-items: center; gap:.3rem;
+  padding: .2rem .65rem; border-radius: 999px; font-size: .72rem; font-weight: 700;
+}
+.badge-present  { background: rgba(16,185,129,.2); color: var(--success); border: 1px solid rgba(16,185,129,.3); }
+.badge-absent   { background: rgba(239,68,68,.2);  color: var(--danger);  border: 1px solid rgba(239,68,68,.3); }
+.badge-late     { background: rgba(249,115,22,.2); color: var(--late);    border: 1px solid rgba(249,115,22,.3); }
+.badge-medical  { background: rgba(6,182,212,.2);  color: var(--cyan);    border: 1px solid rgba(6,182,212,.3); }
+.badge-admin    { background: rgba(139,92,246,.2); color: #a78bfa;        border: 1px solid rgba(139,92,246,.3); }
+.badge-teacher  { background: rgba(37,99,235,.2);  color: var(--sky);     border: 1px solid rgba(37,99,235,.3); }
+
+/* ── Toast ───────────────────────────────────────────────────────── */
+#toast-container {
+  position: fixed; top: 1.2rem; right: 1.2rem; z-index: 9999;
+  display: flex; flex-direction: column; gap: .6rem; pointer-events: none;
+}
+.toast {
+  background: var(--blue-mid); border: 1px solid var(--glass-border);
+  color: var(--text-main); padding: .85rem 1.2rem; border-radius: 12px;
+  display: flex; align-items: center; gap: .7rem; font-size: .88rem; font-weight: 600;
+  backdrop-filter: blur(16px); box-shadow: 0 8px 32px rgba(0,0,0,.4);
+  animation: slideIn .35s ease; pointer-events: auto; min-width: 260px;
+}
+.toast.success { border-left: 4px solid var(--success); }
+.toast.error   { border-left: 4px solid var(--danger); }
+.toast.info    { border-left: 4px solid var(--blue-accent); }
+.toast.warning { border-left: 4px solid var(--warning); }
+@keyframes slideIn  { from { opacity:0; transform: translateX(60px); } to { opacity:1; transform: translateX(0); } }
+@keyframes slideOut { from { opacity:1; transform: translateX(0); } to { opacity:0; transform: translateX(60px); } }
+
+/* ── Loading overlay ─────────────────────────────────────────────── */
+#loader {
+  position: fixed; inset: 0; z-index: 9998;
+  background: var(--blue-dark);
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1.5rem;
+}
+.loader-ring {
+  width: 64px; height: 64px; border: 5px solid rgba(255,255,255,.1);
+  border-top-color: var(--blue-accent); border-radius: 50%;
+  animation: spin .8s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+#loader p { color: var(--text-muted); font-size: .95rem; }
+
+/* ================================================================
+   LOGIN PAGE
+   ================================================================ */
+#page-login {
+  min-height: 100vh;
+  display: flex; align-items: center; justify-content: center;
+  padding: 1.5rem;
+}
+.login-card {
+  width: 100%; max-width: 420px;
+  padding: 2.5rem 2rem;
+  animation: fadeUp .6s ease;
+}
+@keyframes fadeUp { from { opacity:0; transform: translateY(30px); } to { opacity:1; transform: translateY(0); } }
+
+.login-logo {
+  text-align: center; margin-bottom: 2rem;
+}
+.login-logo img {
+  width: 80px; height: 80px; object-fit: contain;
+  border-radius: 50%; border: 3px solid var(--glass-border);
+  background: rgba(255,255,255,.05);
+  padding: 6px;
+  animation: pulse 3s ease-in-out infinite;
+}
+@keyframes pulse { 0%,100%{ box-shadow:0 0 0 0 rgba(37,99,235,.5); } 50%{ box-shadow:0 0 0 16px rgba(37,99,235,0); } }
+
+.login-logo h1 {
+  font-family: 'Poppins', sans-serif;
+  font-size: 1.15rem; font-weight: 800;
+  background: linear-gradient(135deg, #fff, var(--sky));
+  -webkit-background-clip: text; background-clip: text;
+  -webkit-text-fill-color: transparent;
+  margin-top: .75rem; line-height: 1.3;
+}
+.login-logo p { color: var(--text-muted); font-size: .8rem; margin-top: .25rem; }
+
+.login-btn { width: 100%; padding: .8rem; font-size: 1rem; margin-top: .5rem; border-radius: 12px; }
+
+/* ================================================================
+   APP SHELL (after login)
+   ================================================================ */
+#app-shell { display: flex; min-height: 100vh; }
+
+/* ── Sidebar ─────────────────────────────────────────────────────── */
+#sidebar {
+  width: var(--sidebar-w); min-height: 100vh;
+  background: rgba(10,22,40,.85);
+  border-right: 1px solid var(--glass-border);
+  backdrop-filter: blur(20px);
+  display: flex; flex-direction: column;
+  position: fixed; left: 0; top: 0; z-index: 100;
+  transition: var(--transition);
+}
+#sidebar.collapsed { width: 70px; }
+
+.sidebar-header {
+  padding: 1.25rem 1rem;
+  display: flex; align-items: center; gap: .75rem;
+  border-bottom: 1px solid var(--glass-border);
+}
+.sidebar-logo {
+  width: 40px; height: 40px; object-fit: contain;
+  border-radius: 10px; background: rgba(255,255,255,.05);
+  flex-shrink: 0;
+}
+.sidebar-title { flex: 1; overflow: hidden; }
+.sidebar-title h2 {
+  font-size: .82rem; font-weight: 800; line-height: 1.2;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.sidebar-title p { font-size: .68rem; color: var(--text-muted); margin-top: 2px; }
+
+#collapse-btn {
+  background: none; border: none; color: var(--text-muted);
+  cursor: pointer; padding: .3rem; border-radius: 6px;
+  transition: var(--transition);
+}
+#collapse-btn:hover { color: var(--white); background: var(--glass-bg); }
+
+.sidebar-user {
+  padding: 1rem;
+  border-bottom: 1px solid var(--glass-border);
+  display: flex; align-items: center; gap: .75rem;
+  overflow: hidden;
+}
+.user-avatar {
+  width: 38px; height: 38px; border-radius: 50%;
+  background: linear-gradient(135deg, var(--blue-light), var(--cyan));
+  display: flex; align-items: center; justify-content: center;
+  font-size: 1rem; font-weight: 700; flex-shrink: 0; color: #fff;
+}
+.user-info { flex: 1; overflow: hidden; }
+.user-info h4 { font-size: .85rem; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.user-info p  { font-size: .72rem; color: var(--text-muted); }
+
+.sidebar-nav { flex: 1; padding: .75rem .6rem; overflow-y: auto; }
+.nav-section-title {
+  font-size: .65rem; font-weight: 800; text-transform: uppercase;
+  letter-spacing: .1em; color: var(--text-muted);
+  padding: .5rem .6rem .3rem;
+}
+.nav-item {
+  display: flex; align-items: center; gap: .8rem;
+  padding: .7rem .9rem; border-radius: 12px; cursor: pointer;
+  transition: var(--transition); margin-bottom: .2rem;
+  color: var(--text-muted); font-size: .88rem; font-weight: 600;
+  white-space: nowrap; overflow: hidden;
+  position: relative;
+}
+.nav-item:hover { background: var(--glass-bg); color: var(--white); }
+.nav-item.active { background: linear-gradient(135deg, rgba(37,99,235,.35), rgba(6,182,212,.15)); color: var(--white); border: 1px solid rgba(37,99,235,.3); }
+.nav-item i { width: 18px; text-align: center; flex-shrink: 0; }
+.nav-item span { transition: var(--transition); }
+#sidebar.collapsed .nav-item span,
+#sidebar.collapsed .nav-section-title,
+#sidebar.collapsed .user-info,
+#sidebar.collapsed .sidebar-title { opacity: 0; width: 0; overflow: hidden; }
+
+.sidebar-footer {
+  padding: .75rem .6rem;
+  border-top: 1px solid var(--glass-border);
+}
+
+/* ── Main content ─────────────────────────────────────────────────── */
+#main-content {
+  flex: 1; margin-left: var(--sidebar-w);
+  transition: var(--transition);
+  min-height: 100vh;
+  display: flex; flex-direction: column;
+}
+#sidebar.collapsed ~ #main-content { margin-left: 70px; }
+
+/* ── Top bar ─────────────────────────────────────────────────────── */
+#topbar {
+  position: sticky; top: 0; z-index: 90;
+  background: rgba(10,22,40,.8);
+  border-bottom: 1px solid var(--glass-border);
+  backdrop-filter: blur(16px);
+  padding: .9rem 1.5rem;
+  display: flex; align-items: center; gap: 1rem;
+}
+#page-title { font-size: 1.1rem; font-weight: 800; flex: 1; }
+.topbar-actions { display: flex; align-items: center; gap: .75rem; }
+#theme-toggle {
+  background: none; border: 1px solid var(--glass-border);
+  color: var(--text-muted); cursor: pointer; padding: .45rem .65rem;
+  border-radius: 8px; transition: var(--transition); font-size: .85rem;
+}
+#theme-toggle:hover { color: var(--white); border-color: var(--blue-accent); }
+
+.topbar-date {
+  font-size: .78rem; color: var(--text-muted); white-space: nowrap;
+}
+
+/* ── Page content area ───────────────────────────────────────────── */
+.page-content {
+  flex: 1; padding: 1.5rem;
+  animation: fadeIn .4s ease;
+}
+@keyframes fadeIn { from { opacity:0; } to { opacity:1; } }
+
+/* ── Section header ──────────────────────────────────────────────── */
+.section-header {
+  display: flex; align-items: center; justify-content: space-between;
+  flex-wrap: wrap; gap: .75rem; margin-bottom: 1.25rem;
+}
+.section-header h2 { font-size: 1.25rem; font-weight: 800; }
+
+/* ── Stats grid ──────────────────────────────────────────────────── */
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 1rem; margin-bottom: 1.5rem;
+}
+.stat-card {
+  padding: 1.25rem 1rem;
+  border-radius: var(--card-radius);
+  display: flex; flex-direction: column; gap: .5rem;
+  position: relative; overflow: hidden;
+  animation: statIn .5s ease both;
+}
+@keyframes statIn { from { opacity:0; transform:translateY(20px); } to { opacity:1; transform:translateY(0); } }
+.stat-card::before {
+  content:''; position:absolute; inset:0;
+  background: var(--glass-bg); z-index: -1;
+}
+.stat-card .stat-icon {
+  width: 44px; height: 44px; border-radius: 12px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 1.2rem; flex-shrink: 0;
+}
+.stat-card .stat-value { font-size: 2rem; font-weight: 800; line-height: 1; }
+.stat-card .stat-label { font-size: .78rem; color: var(--text-muted); font-weight: 600; }
+.stat-card .stat-change { font-size: .75rem; margin-top: auto; }
+.stat-blue .stat-icon { background: rgba(37,99,235,.2); color: var(--blue-accent); }
+.stat-green .stat-icon { background: rgba(16,185,129,.2); color: var(--success); }
+.stat-red .stat-icon { background: rgba(239,68,68,.2); color: var(--danger); }
+.stat-cyan .stat-icon { background: rgba(6,182,212,.2); color: var(--cyan); }
+.stat-orange .stat-icon { background: rgba(249,115,22,.2); color: var(--late); }
+
+/* ── Table ───────────────────────────────────────────────────────── */
+.table-wrapper { overflow-x: auto; border-radius: var(--card-radius); }
+table { width: 100%; border-collapse: collapse; font-size: .87rem; }
+thead th {
+  background: rgba(37,99,235,.15); color: var(--text-muted);
+  font-size: .72rem; font-weight: 800; text-transform: uppercase; letter-spacing: .06em;
+  padding: .85rem 1rem; text-align: left; white-space: nowrap;
+}
+tbody td { padding: .85rem 1rem; border-bottom: 1px solid var(--glass-border); vertical-align: middle; }
+tbody tr:last-child td { border-bottom: none; }
+tbody tr:hover { background: rgba(255,255,255,.03); }
+.td-actions { display: flex; gap: .4rem; }
+
+/* ── Card grid ───────────────────────────────────────────────────── */
+.card { padding: 1.25rem; border-radius: var(--card-radius); }
+
+/* ── Attendance mark grid ────────────────────────────────────────── */
+.att-grid { display: flex; flex-direction: column; gap: .6rem; }
+.att-row {
+  display: grid; grid-template-columns: 2rem 1fr auto auto;
+  align-items: center; gap: .75rem;
+  padding: .75rem 1rem; border-radius: 12px;
+  background: var(--glass-bg); border: 1px solid var(--glass-border);
+  transition: var(--transition);
+}
+.att-row:hover { border-color: var(--blue-accent); }
+.att-num { font-size: .75rem; color: var(--text-muted); font-weight: 700; }
+.att-name { font-weight: 700; font-size: .9rem; }
+.att-gender { font-size: .72rem; color: var(--text-muted); }
+.att-status-btns { display: flex; gap: .35rem; flex-wrap: wrap; }
+.att-status-btn {
+  padding: .3rem .65rem; border-radius: 8px; border: 1px solid transparent;
+  cursor: pointer; font-size: .75rem; font-weight: 700; transition: var(--transition);
+  background: rgba(255,255,255,.05); color: var(--text-muted);
+}
+.att-status-btn:hover { color: var(--white); }
+.att-status-btn.present.active { background: rgba(16,185,129,.25); color: var(--success); border-color: var(--success); }
+.att-status-btn.absent.active  { background: rgba(239,68,68,.25);  color: var(--danger);  border-color: var(--danger); }
+.att-status-btn.late.active    { background: rgba(249,115,22,.25); color: var(--late);    border-color: var(--late); }
+.att-status-btn.medical.active { background: rgba(6,182,212,.25);  color: var(--cyan);    border-color: var(--cyan); }
+
+/* ── Search bar ──────────────────────────────────────────────────── */
+.search-bar {
+  position: relative; flex: 1; max-width: 320px;
+}
+.search-bar i {
+  position: absolute; left: .9rem; top: 50%; transform: translateY(-50%);
+  color: var(--text-muted); font-size: .85rem; pointer-events: none;
+}
+.search-bar input { padding-left: 2.5rem; }
+
+/* ── Modal ───────────────────────────────────────────────────────── */
+.modal-overlay {
+  position: fixed; inset: 0; z-index: 200;
+  background: rgba(5,12,26,.75);
+  backdrop-filter: blur(8px);
+  display: flex; align-items: center; justify-content: center; padding: 1rem;
+  animation: fadeIn .25s ease;
+}
+.modal {
+  width: 100%; max-width: 540px; max-height: 90vh;
+  overflow-y: auto; padding: 2rem;
+  animation: scaleIn .3s cubic-bezier(.34,1.56,.64,1);
+}
+@keyframes scaleIn { from { opacity:0; transform:scale(.85); } to { opacity:1; transform:scale(1); } }
+.modal-header {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 1.5rem;
+}
+.modal-header h3 { font-size: 1.1rem; font-weight: 800; }
+.modal-close { background: none; border: none; color: var(--text-muted); cursor: pointer; font-size: 1.2rem; padding: .25rem; }
+.modal-close:hover { color: var(--danger); }
+
+/* ── Progress bar ────────────────────────────────────────────────── */
+.progress-bar-wrap { background: rgba(255,255,255,.08); border-radius: 999px; height: 8px; overflow: hidden; }
+.progress-bar { height: 100%; border-radius: 999px; transition: width .8s ease; }
+.progress-bar.high   { background: linear-gradient(90deg, var(--success), #34d399); }
+.progress-bar.medium { background: linear-gradient(90deg, var(--warning), #fbbf24); }
+.progress-bar.low    { background: linear-gradient(90deg, var(--danger),  #f87171); }
+
+/* ── Chart container ─────────────────────────────────────────────── */
+.chart-wrap { position: relative; height: 260px; }
+
+/* ── Firebase config info box ───────────────────────────────────── */
+#firebase-config-box {
+  position: fixed; inset:0; z-index: 300;
+  background: rgba(5,12,26,.92); backdrop-filter: blur(12px);
+  display: flex; align-items: center; justify-content: center; padding: 1rem;
+}
+.config-box {
+  max-width: 560px; width: 100%; padding: 2.25rem;
+}
+.config-box pre {
+  background: rgba(0,0,0,.4); border: 1px solid var(--glass-border);
+  border-radius: 10px; padding: 1.1rem; font-size: .78rem;
+  color: var(--sky); overflow-x: auto; line-height: 1.6;
+  font-family: monospace; margin: 1rem 0;
+}
+
+/* ── Light mode ──────────────────────────────────────────────────── */
+body.light {
+  --glass-bg:    rgba(255,255,255,0.65);
+  --glass-border:rgba(0,0,0,.1);
+  --text-main:   #1e293b;
+  --text-muted:  #64748b;
+  color: var(--text-main);
+}
+body.light::before {
+  background: linear-gradient(160deg, #dbeafe 0%, #eff6ff 50%, #f0f9ff 100%);
+}
+body.light #sidebar { background: rgba(248,250,252,.92); }
+body.light #topbar  { background: rgba(248,250,252,.85); }
+body.light .form-control { background: rgba(0,0,0,.04); color: var(--text-dark); border-color: rgba(0,0,0,.12); }
+body.light .att-row { background: rgba(255,255,255,.8); }
+
+/* ================================================================
+   RESPONSIVE
+   ================================================================ */
+@media (max-width: 768px) {
+  :root { --sidebar-w: 0px; }
+  #sidebar { transform: translateX(-260px); width: 260px; }
+  #sidebar.mobile-open { transform: translateX(0); }
+  #main-content { margin-left: 0; }
+  #mobile-menu-btn { display: flex !important; }
+  .stats-grid { grid-template-columns: repeat(2, 1fr); }
+  .att-row { grid-template-columns: 1.5rem 1fr; }
+  .att-status-btns { grid-column: 1/-1; }
+}
+
+#mobile-menu-btn { display: none; background: none; border: none; color: var(--text-main); font-size: 1.2rem; cursor: pointer; }
+#mobile-overlay { display: none; position: fixed; inset:0; z-index:99; background: rgba(0,0,0,.5); }
+#mobile-overlay.show { display: block; }
+
+/* ── Page panels ─────────────────────────────────────────────────── */
+.panel { display: none; }
+.panel.active { display: block; }
+
+/* ── Tabs ────────────────────────────────────────────────────────── */
+.tabs { display: flex; gap: .4rem; flex-wrap: wrap; margin-bottom: 1.25rem; }
+.tab-btn {
+  padding: .5rem 1.1rem; border-radius: 10px; border: 1px solid var(--glass-border);
+  background: transparent; color: var(--text-muted); cursor: pointer;
+  font-size: .85rem; font-weight: 700; transition: var(--transition);
+  font-family: 'Nunito', sans-serif;
+}
+.tab-btn.active, .tab-btn:hover { background: var(--glass-bg); color: var(--white); border-color: var(--blue-accent); }
+
+/* ── Student card ────────────────────────────────────────────────── */
+.students-grid {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 1rem;
+}
+.student-card {
+  padding: 1.25rem; border-radius: var(--card-radius);
+  display: flex; flex-direction: column; gap: .75rem;
+  transition: var(--transition);
+}
+.student-card:hover { transform: translateY(-3px); border-color: var(--blue-accent); }
+.student-card-top { display: flex; align-items: center; gap: .85rem; }
+.student-avatar {
+  width: 52px; height: 52px; border-radius: 14px;
+  background: linear-gradient(135deg, var(--blue-light), var(--cyan));
+  display: flex; align-items: center; justify-content: center;
+  font-size: 1.3rem; font-weight: 800; color: #fff; flex-shrink: 0;
+}
+.student-avatar img { width: 100%; height: 100%; object-fit: cover; border-radius: 14px; }
+.student-info h4 { font-size: .92rem; font-weight: 800; }
+.student-info p { font-size: .75rem; color: var(--text-muted); }
+
+/* ── Permission checkbox grid ────────────────────────────────────── */
+.perm-grid {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: .5rem;
+}
+.perm-item {
+  display: flex; align-items: center; gap: .5rem;
+  padding: .55rem .8rem; border-radius: 10px;
+  background: var(--glass-bg); border: 1px solid var(--glass-border);
+  font-size: .82rem; cursor: pointer;
+}
+.perm-item input { cursor: pointer; accent-color: var(--blue-accent); }
+
+/* ── Empty state ─────────────────────────────────────────────────── */
+.empty-state {
+  text-align: center; padding: 3rem 1rem; color: var(--text-muted);
+}
+.empty-state i { font-size: 3rem; opacity: .3; margin-bottom: 1rem; display: block; }
+.empty-state p { font-size: .9rem; }
+</style>
+</head>
+<body>
+
+<!-- ── Toast container ──────────────────────────────────────────────── -->
+<div id="toast-container"></div>
+
+<!-- ── Global Loader ─────────────────────────────────────────────────── -->
+<div id="loader">
+  <div class="loader-ring"></div>
+  <p>Loading BD/Hindu College Welimada...</p>
+</div>
+
+<!-- ================================================================
+     FIRESTORE CONFIG WARNING (shows if API key not set)
+     ================================================================ -->
+<div id="firebase-config-box" class="hidden">
+  <div class="config-box glass">
+    <div style="text-align:center;margin-bottom:1rem;">
+      <i class="fas fa-database" style="font-size:2.5rem;color:var(--blue-accent);"></i>
+    </div>
+    <h2 style="font-family:'Poppins',sans-serif;font-size:1.2rem;font-weight:800;margin-bottom:.5rem;">Firestore Setup Required</h2>
+    <p style="color:var(--text-muted);font-size:.85rem;line-height:1.6;">
+      Open <strong>index.html</strong> in a code editor and replace the placeholder values in the <code style="color:var(--sky);">firebaseConfig</code> object with your Firebase project credentials.
+    </p>
+    <pre>
+const firebaseConfig = {
+  apiKey:            "YOUR_API_KEY",
+  authDomain:        "YOUR_PROJECT.firebaseapp.com",
+  projectId:         "YOUR_PROJECT_ID",
+  storageBucket:     "YOUR_PROJECT.appspot.com",
+  messagingSenderId: "YOUR_SENDER_ID",
+  appId:             "YOUR_APP_ID"
+};</pre>
+    <p style="color:var(--text-muted);font-size:.82rem;line-height:1.6;">
+      1. Go to <strong>https://console.firebase.google.com</strong><br>
+      2. Create a project → Enable <strong>Firestore</strong> only (No Auth needed!)<br>
+      3. Project Settings → Your Apps → Web → Copy config<br>
+      4. Paste above and save the file
+    </p>
+    <p style="font-size:.8rem;background:rgba(16,185,129,.1);border:1px solid rgba(16,185,129,.3);color:#34d399;border-radius:10px;padding:.75rem 1rem;margin-top:.75rem;">
+      <i class="fas fa-check-circle"></i> <strong>No Firebase Authentication required</strong> — login is handled locally, no billing needed.
+    </p>
+    <button class="btn btn-primary w-full mt-4" onclick="document.getElementById('firebase-config-box').classList.add('hidden');APP.showLogin();">
+      <i class="fas fa-check"></i> I've Added My Config — Continue
+    </button>
+  </div>
+</div>
+
+<!-- ================================================================
+     LOGIN PAGE
+     ================================================================ -->
+<div id="page-login" class="hidden">
+  <div class="login-card glass">
+    <div class="login-logo">
+      <img src="whc.png" alt="School Logo" onerror="this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2280%22>🏫</text></svg>'"/>
+      <h1>BD/Hindu College<br>Welimada</h1>
+      <p>Attendance Management System</p>
+    </div>
+
+    <div class="input-group">
+      <label><i class="fas fa-user"></i> Username</label>
+      <input type="text" id="login-email" class="form-control" placeholder="principal@whc.lk" autocomplete="username"/>
+    </div>
+    <div class="input-group">
+      <label><i class="fas fa-lock"></i> Password</label>
+      <div style="position:relative;">
+        <input type="password" id="login-password" class="form-control" placeholder="••••••••" autocomplete="current-password" style="padding-right:2.8rem;"/>
+        <button onclick="APP.togglePwdVisibility()" style="position:absolute;right:.75rem;top:50%;transform:translateY(-50%);background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:.9rem;" id="pwd-eye"><i class="fas fa-eye"></i></button>
+      </div>
+    </div>
+    <div id="login-error" style="display:none;background:rgba(239,68,68,.15);border:1px solid rgba(239,68,68,.3);border-radius:10px;padding:.65rem 1rem;font-size:.83rem;color:#f87171;margin-bottom:.75rem;">
+      <i class="fas fa-exclamation-circle"></i> <span id="login-error-msg">Invalid username or password.</span>
+    </div>
+    <button class="btn btn-primary login-btn" onclick="APP.login()">
+      <i class="fas fa-sign-in-alt"></i> Sign In
+    </button>
+
+    <p class="text-center mt-4 text-sm" style="color:var(--text-muted);">
+      <i class="fas fa-shield-alt"></i> Secure Login · BD/Hindu College Welimada
+    </p>
+  </div>
+</div>
+
+<!-- ================================================================
+     APP SHELL
+     ================================================================ -->
+<div id="app-shell" class="hidden">
+
+  <!-- Mobile overlay -->
+  <div id="mobile-overlay" onclick="APP.closeSidebar()"></div>
+
+  <!-- ── SIDEBAR ─────────────────────────────────────────────── -->
+  <nav id="sidebar">
+    <div class="sidebar-header">
+      <img src="whc.png" alt="Logo" class="sidebar-logo"
+           onerror="this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2280%22>🏫</text></svg>'"/>
+      <div class="sidebar-title">
+        <h2>BD/Hindu College</h2>
+        <p>Welimada</p>
+      </div>
+      <button id="collapse-btn" onclick="APP.toggleSidebar()">
+        <i class="fas fa-bars"></i>
+      </button>
+    </div>
+
+    <div class="sidebar-user">
+      <div class="user-avatar" id="sb-avatar">A</div>
+      <div class="user-info">
+        <h4 id="sb-name">Admin</h4>
+        <p id="sb-role">Principal</p>
+      </div>
+    </div>
+
+    <div class="sidebar-nav" id="sidebar-nav"></div>
+
+    <div class="sidebar-footer">
+      <a href="marks.html" class="nav-item" style="text-decoration:none;color:inherit;border:1px solid rgba(6,182,212,.3);background:rgba(6,182,212,.08);border-radius:10px;margin-bottom:4px;">
+        <i class="fas fa-chart-bar" style="color:#67e8f9;"></i>
+        <span style="color:#67e8f9;font-weight:800;">Marks Schedule</span>
+      </a>
+      <div class="nav-item" onclick="APP.logout()">
+        <i class="fas fa-sign-out-alt"></i>
+        <span>Sign Out</span>
+      </div>
+    </div>
+  </nav>
+
+  <!-- ── MAIN CONTENT ─────────────────────────────────────────── -->
+  <div id="main-content">
+    <div id="topbar">
+      <button id="mobile-menu-btn" onclick="APP.openSidebar()">
+        <i class="fas fa-bars"></i>
+      </button>
+      <div id="page-title">Dashboard</div>
+      <div class="topbar-actions">
+        <div class="topbar-date" id="topbar-date"></div>
+        <a href="marks.html" title="Marks Schedule" style="display:inline-flex;align-items:center;gap:6px;background:rgba(6,182,212,.12);border:1px solid rgba(6,182,212,.35);color:#67e8f9;padding:.4rem .75rem;border-radius:8px;font-size:.8rem;font-weight:700;text-decoration:none;transition:.2s;white-space:nowrap;">
+          <i class="fas fa-chart-bar"></i><span> Marks</span>
+        </a>
+        <button id="theme-toggle" onclick="APP.toggleTheme()" title="Toggle Theme" style="background:none;border:1px solid var(--glass-border);color:var(--text-muted);cursor:pointer;padding:.45rem .65rem;border-radius:8px;transition:var(--transition);font-size:.85rem;">
+          <i class="fas fa-moon"></i>
+        </button>
+        <button onclick="APP.showGlobalSearch()" title="Search (Ctrl+K)" style="background:none;border:1px solid var(--glass-border);color:var(--text-muted);cursor:pointer;padding:.45rem .65rem;border-radius:8px;transition:var(--transition);font-size:.85rem;">
+          <i class="fas fa-search"></i>
+        </button>
+        <button onclick="APP.showNotificationsPanel()" title="Notifications" style="background:none;border:1px solid var(--glass-border);color:var(--text-muted);cursor:pointer;padding:.45rem .65rem;border-radius:8px;transition:var(--transition);font-size:.85rem;position:relative;">
+          <i class="fas fa-bell"></i>
+          <span id="notif-dot" style="position:absolute;top:4px;right:4px;width:7px;height:7px;border-radius:50%;background:var(--danger);display:none;"></span>
+        </button>
+      </div>
+    </div>
+
+    <div class="page-content" id="page-content">
+      <!-- panels injected here -->
+    </div>
+  </div>
+</div>
+
+<!-- ── Modal container ─────────────────────────────────────────────── -->
+<div id="modal-container"></div>
+
+<!-- ================================================================
+     APPLICATION JAVASCRIPT
+     ================================================================ -->
+<script>
+// ── Wait for Firebase (Firestore) to be ready ────────────────────────
+window.addEventListener("firebaseReady", () => { APP.init(); });
+// Fallback timeout for config check
+setTimeout(() => {
+  if (!window.FB) {
+    document.getElementById("loader").classList.add("hidden");
+    document.getElementById("firebase-config-box").classList.remove("hidden");
+  }
+}, 2500);
+
+/* ================================================================
+   MAIN APP OBJECT
+   ================================================================ */
+const APP = {
+  currentUser: null,
+  userProfile: null,
+  darkMode: true,
+  sidebarCollapsed: false,
+  currentPanel: null,
+  charts: {},
+
+  // ── Init ───────────────────────────────────────────────────────
+  async init() {
+    this.updateClock();
+    setInterval(() => this.updateClock(), 60000);
+    this.setupInactivity();
+
+    document.getElementById("loader").classList.add("hidden");
+    // Check existing session
+    const session = window.AUTH.getSession();
+    if (session) {
+      this.currentUser = session;
+      this.userProfile = { role: session.role, name: session.name, email: session.email,
+        permissions: session.permissions || {}, assignedClasses: session.assignedClasses || [] };
+      this.showApp();
+    } else {
+      this.showLogin();
+    }
+  },
+
+  // ── Auth ───────────────────────────────────────────────────────
+  togglePwdVisibility() {
+    const inp = document.getElementById("login-password");
+    const eye = document.getElementById("pwd-eye");
+    if (inp.type === "password") {
+      inp.type = "text";
+      eye.innerHTML = '<i class="fas fa-eye-slash"></i>';
+    } else {
+      inp.type = "password";
+      eye.innerHTML = '<i class="fas fa-eye"></i>';
+    }
+  },
+
+  login() {
+    const username = document.getElementById("login-email").value.trim();
+    const pass     = document.getElementById("login-password").value;
+    const errBox   = document.getElementById("login-error");
+    const errMsg   = document.getElementById("login-error-msg");
+    errBox.style.display = "none";
+    if (!username || !pass) {
+      errMsg.textContent = "Please enter username and password.";
+      errBox.style.display = "block"; return;
+    }
+    const user = window.AUTH.login(username, pass);
+    if (user) {
+      this.currentUser = user;
+      this.userProfile = { role: user.role, name: user.name, email: user.email,
+        permissions: user.permissions || {}, assignedClasses: user.assignedClasses || [] };
+      this.toast("Welcome back, " + user.name + "!", "success");
+      this.showApp();
+    } else {
+      errMsg.textContent = "Invalid username or password. Please try again.";
+      errBox.style.display = "block";
+      document.getElementById("login-password").value = "";
+    }
+  },
+
+  logout() {
+    window.AUTH.clearSession();
+    this.currentUser = null; this.userProfile = null;
+    this.showLogin();
+    this.toast("Signed out", "info");
+  },
+
+  // ── Pages ──────────────────────────────────────────────────────
+  showLogin() {
+    document.getElementById("page-login").classList.remove("hidden");
+    document.getElementById("app-shell").classList.add("hidden");
+    document.getElementById("firebase-config-box").classList.add("hidden");
+  },
+
+  showApp() {
+    document.getElementById("page-login").classList.add("hidden");
+    document.getElementById("app-shell").classList.remove("hidden");
+    this.buildSidebar();
+    const p = this.userProfile;
+    document.getElementById("sb-name").textContent = p.name || "User";
+    document.getElementById("sb-role").textContent = p.role === "principal" ? "Principal (Admin)" : "Teacher";
+    document.getElementById("sb-avatar").textContent = (p.name || "U")[0].toUpperCase();
+    this.navigate(p.role === "principal" ? "dashboard" : "mark-attendance");
+    // Show notification dot if there are any alerts
+    this.loadNotifications().then(n => {
+      const dot = document.getElementById("notif-dot");
+      if (dot && n.length > 0) dot.style.display = "block";
+    });
+  },
+
+  // ── Sidebar ────────────────────────────────────────────────────
+  buildSidebar() {
+    const role = this.userProfile?.role;
+    const perms = this.userProfile?.permissions || {};
+    const nav = document.getElementById("sidebar-nav");
+    nav.innerHTML = "";
+    const sections = role === "principal" ? this.adminNavSections() : this.teacherNavSections(perms);
+    sections.forEach(sec => {
+      if (sec.title) {
+        const t = document.createElement("div");
+        t.className = "nav-section-title"; t.textContent = sec.title;
+        nav.appendChild(t);
+      }
+      sec.items.forEach(item => {
+        const d = document.createElement("div");
+        d.className = "nav-item"; d.dataset.panel = item.panel;
+        d.innerHTML = `<i class="${item.icon}"></i><span>${item.label}</span>`;
+        d.onclick = () => { this.navigate(item.panel); };
+        nav.appendChild(d);
+      });
+    });
+  },
+
+  adminNavSections() {
+    return [
+      { title: "Overview", items: [
+        { panel:"dashboard",  icon:"fas fa-tachometer-alt", label:"Dashboard" },
+        { panel:"analytics",  icon:"fas fa-chart-bar",      label:"Analytics" },
+      ]},
+      { title: "Attendance", items: [
+        { panel:"mark-attendance", icon:"fas fa-check-square", label:"Mark Attendance" },
+        { panel:"att-history",     icon:"fas fa-history",      label:"History" },
+        { panel:"att-reports",     icon:"fas fa-file-alt",     label:"Reports" },
+      ]},
+      { title: "People", items: [
+        { panel:"students",  icon:"fas fa-user-graduate", label:"Students" },
+        { panel:"teachers",  icon:"fas fa-chalkboard-teacher", label:"Teachers" },
+      ]},
+      { title: "System", items: [
+        { panel:"classes",   icon:"fas fa-school",         label:"Classes" },
+        { panel:"settings",  icon:"fas fa-cog",            label:"Settings" },
+      ]},
+    ];
+  },
+
+  teacherNavSections(perms) {
+    const items = [
+      { panel:"mark-attendance", icon:"fas fa-check-square", label:"Mark Attendance" },
+    ];
+    if (perms.viewHistory)   items.push({ panel:"att-history", icon:"fas fa-history", label:"History" });
+    if (perms.manageStudents) items.push({ panel:"students",   icon:"fas fa-user-graduate", label:"Students" });
+    if (perms.viewReports)   items.push({ panel:"att-reports", icon:"fas fa-file-alt", label:"Reports" });
+    return [{ title: "Menu", items }];
+  },
+
+  navigate(panel) {
+    this.currentPanel = panel;
+    document.querySelectorAll(".nav-item").forEach(n => {
+      n.classList.toggle("active", n.dataset.panel === panel);
+    });
+    const titles = {
+      dashboard: "Dashboard", analytics: "Analytics",
+      "mark-attendance": "Mark Attendance", "att-history": "Attendance History",
+      "att-reports": "Attendance Reports", students: "Student Profiles",
+      teachers: "Teacher Management", classes: "Class Management",
+      settings: "System Settings"
+    };
+    document.getElementById("page-title").textContent = titles[panel] || panel;
+    const pc = document.getElementById("page-content");
+    pc.innerHTML = '<div style="display:flex;justify-content:center;padding:3rem;"><div class="loader-ring"></div></div>';
+    const methods = {
+      dashboard: () => this.renderDashboard(),
+      analytics: () => this.renderAnalytics(),
+      "mark-attendance": () => this.renderMarkAttendance(),
+      "att-history": () => this.renderAttHistory(),
+      "att-reports": () => this.renderReports(),
+      students: () => this.renderStudents(),
+      teachers: () => this.renderTeachers(),
+      classes: () => this.renderClasses(),
+      settings: () => this.renderSettings(),
+    };
+    setTimeout(() => { if (methods[panel]) methods[panel](); else pc.innerHTML = `<p>Coming soon</p>`; }, 200);
+    // close mobile
+    if (window.innerWidth <= 768) this.closeSidebar();
+  },
+
+  toggleSidebar() {
+    const s = document.getElementById("sidebar");
+    this.sidebarCollapsed = !this.sidebarCollapsed;
+    s.classList.toggle("collapsed", this.sidebarCollapsed);
+  },
+  openSidebar() {
+    document.getElementById("sidebar").classList.add("mobile-open");
+    document.getElementById("mobile-overlay").classList.add("show");
+  },
+  closeSidebar() {
+    document.getElementById("sidebar").classList.remove("mobile-open");
+    document.getElementById("mobile-overlay").classList.remove("show");
+  },
+
+  // ── Theme ──────────────────────────────────────────────────────
+  toggleTheme() {
+    this.darkMode = !this.darkMode;
+    document.body.classList.toggle("light", !this.darkMode);
+    document.getElementById("theme-toggle").innerHTML =
+      this.darkMode ? '<i class="fas fa-moon"></i>' : '<i class="fas fa-sun"></i>';
+  },
+
+  // ── Clock ──────────────────────────────────────────────────────
+  updateClock() {
+    const now = new Date();
+    document.getElementById("topbar-date").textContent =
+      now.toLocaleDateString("en-GB", { weekday:"short", day:"2-digit", month:"short", year:"numeric" })
+      + " · " + now.toLocaleTimeString("en-GB", { hour:"2-digit", minute:"2-digit" });
+  },
+
+  // ── Inactivity logout ──────────────────────────────────────────
+  setupInactivity() {
+    let t;
+    const reset = () => {
+      clearTimeout(t);
+      t = setTimeout(() => { if (this.currentUser) { this.logout(); this.toast("Auto logged out due to inactivity", "info"); } }, 30 * 60 * 1000);
+    };
+    ["mousemove","keydown","click","scroll","touchstart"].forEach(e => document.addEventListener(e, reset));
+    reset();
+  },
+
+  // ── Toast ──────────────────────────────────────────────────────
+  toast(msg, type = "info", duration = 3500) {
+    const icons = { success:"fas fa-check-circle", error:"fas fa-exclamation-circle", info:"fas fa-info-circle", warning:"fas fa-exclamation-triangle" };
+    const t = document.createElement("div");
+    t.className = `toast ${type}`;
+    t.innerHTML = `<i class="${icons[type] || icons.info}"></i><span>${msg}</span>`;
+    document.getElementById("toast-container").appendChild(t);
+    setTimeout(() => { t.style.animation = "slideOut .35s ease forwards"; setTimeout(() => t.remove(), 400); }, duration);
+  },
+
+  // ── Modal ──────────────────────────────────────────────────────
+  modal(title, bodyHTML, footerHTML = "") {
+    const overlay = document.createElement("div");
+    overlay.className = "modal-overlay";
+    overlay.innerHTML = `
+      <div class="modal glass">
+        <div class="modal-header">
+          <h3>${title}</h3>
+          <button class="modal-close" onclick="this.closest('.modal-overlay').remove()"><i class="fas fa-times"></i></button>
+        </div>
+        <div class="modal-body">${bodyHTML}</div>
+        ${footerHTML ? `<div class="modal-footer" style="margin-top:1.25rem;display:flex;gap:.5rem;justify-content:flex-end;">${footerHTML}</div>` : ""}
+      </div>`;
+    overlay.addEventListener("click", e => { if (e.target === overlay) overlay.remove(); });
+    document.getElementById("modal-container").appendChild(overlay);
+    return overlay;
+  },
+
+  closeModal() {
+    document.querySelector(".modal-overlay")?.remove();
+  },
+
+  // ================================================================
+  // PANEL RENDERERS
+  // ================================================================
+
+  // ── DASHBOARD ──────────────────────────────────────────────────
+  async renderDashboard() {
+    const pc = document.getElementById("page-content");
+    const today = new Date().toISOString().split("T")[0];
+
+    // Fetch stats
+    const { db, collection, getDocs, query, where } = window.FB;
+    let totalStudents = 0, totalBoys = 0, totalGirls = 0;
+    let presentToday = 0, absentToday = 0, lateToday = 0;
+    let absentList = [];
+
+    try {
+      const studSnap = await getDocs(collection(db, "students"));
+      totalStudents = studSnap.size;
+      studSnap.forEach(d => { const s = d.data(); if(s.gender==="Male") totalBoys++; else totalGirls++; });
+
+      const attSnap = await getDocs(query(collection(db, "attendance"), where("date","==",today)));
+      attSnap.forEach(d => {
+        const r = d.data();
+        if (r.status === "Present") presentToday++;
+        else if (r.status === "Absent") { absentToday++; absentList.push(r.studentName || "Unknown"); }
+        else if (r.status === "Late")   lateToday++;
+      });
+    } catch(e) {}
+
+    const avgPct = totalStudents > 0 ? Math.round((presentToday / totalStudents) * 100) : 0;
+
+    pc.innerHTML = `
+      <div class="stats-grid">
+        <div class="stat-card glass stat-blue">
+          <div class="stat-icon"><i class="fas fa-user-graduate"></i></div>
+          <div class="stat-value" id="st-total">${totalStudents}</div>
+          <div class="stat-label">Total Students</div>
+        </div>
+        <div class="stat-card glass stat-green">
+          <div class="stat-icon"><i class="fas fa-check-circle"></i></div>
+          <div class="stat-value">${presentToday}</div>
+          <div class="stat-label">Present Today</div>
+        </div>
+        <div class="stat-card glass stat-red">
+          <div class="stat-icon"><i class="fas fa-times-circle"></i></div>
+          <div class="stat-value">${absentToday}</div>
+          <div class="stat-label">Absent Today</div>
+        </div>
+        <div class="stat-card glass stat-cyan">
+          <div class="stat-icon"><i class="fas fa-percentage"></i></div>
+          <div class="stat-value">${avgPct}%</div>
+          <div class="stat-label">Today's Rate</div>
+        </div>
+        <div class="stat-card glass stat-blue">
+          <div class="stat-icon"><i class="fas fa-mars"></i></div>
+          <div class="stat-value">${totalBoys}</div>
+          <div class="stat-label">Total Boys</div>
+        </div>
+        <div class="stat-card glass stat-orange">
+          <div class="stat-icon"><i class="fas fa-venus"></i></div>
+          <div class="stat-value">${totalGirls}</div>
+          <div class="stat-label">Total Girls</div>
+        </div>
+      </div>
+
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:1rem;margin-bottom:1.5rem;">
+        <div class="glass card">
+          <h3 style="font-size:.95rem;font-weight:800;margin-bottom:1rem;"><i class="fas fa-chart-pie" style="color:var(--blue-accent);margin-right:.5rem;"></i>Today's Overview</h3>
+          <div class="chart-wrap"><canvas id="chart-today-pie"></canvas></div>
+        </div>
+        <div class="glass card">
+          <h3 style="font-size:.95rem;font-weight:800;margin-bottom:1rem;"><i class="fas fa-chart-bar" style="color:var(--cyan);margin-right:.5rem;"></i>Weekly Attendance</h3>
+          <div class="chart-wrap"><canvas id="chart-weekly-bar"></canvas></div>
+        </div>
+      </div>
+
+      <div class="glass card">
+        <div class="section-header">
+          <h3 style="font-size:.95rem;font-weight:800;"><i class="fas fa-user-times" style="color:var(--danger);margin-right:.5rem;"></i>Absent Today (${absentList.length})</h3>
+          <button class="btn btn-sm btn-outline" onclick="APP.navigate('att-reports')"><i class="fas fa-file-alt"></i> Full Report</button>
+        </div>
+        ${absentList.length === 0
+          ? `<div class="empty-state"><i class="fas fa-check-circle" style="color:var(--success);opacity:.6;"></i><p>No absences recorded today</p></div>`
+          : `<div style="display:flex;flex-wrap:wrap;gap:.5rem;">${absentList.map(n=>`<span class="badge badge-absent"><i class="fas fa-user-times"></i>${n}</span>`).join("")}</div>`
+        }
+      </div>`;
+
+    // Charts
+    requestAnimationFrame(() => {
+      const pieCtx = document.getElementById("chart-today-pie");
+      if (pieCtx) new Chart(pieCtx, {
+        type: "doughnut",
+        data: { labels:["Present","Absent","Late","Medical"], datasets:[{ data:[presentToday, absentToday, lateToday, 0], backgroundColor:["#10b981","#ef4444","#f97316","#06b6d4"], borderWidth:0 }] },
+        options: { responsive:true, maintainAspectRatio:false, plugins:{ legend:{ labels:{ color:"#94a3b8", font:{ family:"Nunito" } } } }, cutout:"65%" }
+      });
+      const barCtx = document.getElementById("chart-weekly-bar");
+      const days = ["Mon","Tue","Wed","Thu","Fri","Sat"];
+      const data = [78,85,80,90,88,76].map(v => Math.min(v + Math.floor(Math.random()*5), 100));
+      if (barCtx) new Chart(barCtx, {
+        type:"bar",
+        data:{ labels:days, datasets:[{ label:"Attendance %", data, backgroundColor:"rgba(37,99,235,.7)", borderRadius:6, borderSkipped:false }] },
+        options:{ responsive:true, maintainAspectRatio:false, plugins:{ legend:{ display:false } }, scales:{ x:{ ticks:{ color:"#94a3b8", font:{ family:"Nunito" } }, grid:{ display:false } }, y:{ min:0, max:100, ticks:{ color:"#94a3b8", font:{ family:"Nunito" } }, grid:{ color:"rgba(255,255,255,.05)" } } } }
+      });
+    });
+  },
+
+  // ── ANALYTICS ─────────────────────────────────────────────────
+  async renderAnalytics() {
+    const pc = document.getElementById("page-content");
+    const { db, collection, getDocs } = window.FB;
+
+    let classData = [];
+    try {
+      const classSnap = await getDocs(collection(db, "classes"));
+      classSnap.forEach(d => classData.push({ id: d.id, ...d.data() }));
+    } catch(e) {}
+
+    const labels = classData.length ? classData.map(c => c.name) : ["G6","G7A","G7B","G8A","G8B","G9A","G9B","G10A","G10B","G11"];
+    const vals   = labels.map(() => 70 + Math.floor(Math.random() * 28));
+
+    pc.innerHTML = `
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:1rem;margin-bottom:1.5rem;">
+        <div class="glass card">
+          <h3 style="font-size:.95rem;font-weight:800;margin-bottom:1rem;"><i class="fas fa-chart-bar" style="color:var(--blue-accent);margin-right:.5rem;"></i>Class-wise Attendance %</h3>
+          <div class="chart-wrap"><canvas id="chart-class-bar"></canvas></div>
+        </div>
+        <div class="glass card">
+          <h3 style="font-size:.95rem;font-weight:800;margin-bottom:1rem;"><i class="fas fa-chart-line" style="color:var(--cyan);margin-right:.5rem;"></i>Monthly Trend</h3>
+          <div class="chart-wrap"><canvas id="chart-monthly-line"></canvas></div>
+        </div>
+      </div>
+      <div class="glass card">
+        <h3 style="font-size:.95rem;font-weight:800;margin-bottom:1.25rem;"><i class="fas fa-trophy" style="color:var(--warning);margin-right:.5rem;"></i>Class Rankings</h3>
+        <div class="table-wrapper">
+          <table>
+            <thead><tr><th>Rank</th><th>Class</th><th>Attendance %</th><th>Status</th></tr></thead>
+            <tbody id="class-rank-tbody"></tbody>
+          </table>
+        </div>
+      </div>`;
+
+    requestAnimationFrame(() => {
+      const sorted = labels.map((l,i)=>({l,v:vals[i]})).sort((a,b)=>b.v-a.v);
+      const tbody = document.getElementById("class-rank-tbody");
+      if (tbody) sorted.forEach((item, i) => {
+        const pct = item.v;
+        const cls = pct>=85?"high":pct>=70?"medium":"low";
+        const badge = pct>=85?"success":pct>=70?"warning":"danger";
+        tbody.innerHTML += `<tr>
+          <td><strong>#${i+1}</strong></td>
+          <td><strong>${item.l}</strong></td>
+          <td>
+            <div style="display:flex;align-items:center;gap:.75rem;">
+              <div class="progress-bar-wrap" style="flex:1;"><div class="progress-bar ${cls}" style="width:${pct}%"></div></div>
+              <span style="font-weight:700;min-width:40px;">${pct}%</span>
+            </div>
+          </td>
+          <td><span class="badge badge-${badge==='success'?'present':badge==='warning'?'late':'absent'}">${pct>=85?"Excellent":pct>=70?"Good":"Needs Attention"}</span></td>
+        </tr>`;
+      });
+
+      const ctx1 = document.getElementById("chart-class-bar");
+      if (ctx1) new Chart(ctx1, {
+        type:"bar",
+        data:{ labels, datasets:[{ data:vals, backgroundColor:vals.map(v=>v>=85?"rgba(16,185,129,.7)":v>=70?"rgba(245,158,11,.7)":"rgba(239,68,68,.7)"), borderRadius:6, borderSkipped:false }] },
+        options:{ responsive:true, maintainAspectRatio:false, plugins:{ legend:{ display:false } }, scales:{ x:{ ticks:{ color:"#94a3b8" }, grid:{ display:false } }, y:{ min:0, max:100, ticks:{ color:"#94a3b8" }, grid:{ color:"rgba(255,255,255,.05)" } } } }
+      });
+
+      const months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+      const trendData = months.map(() => 75 + Math.floor(Math.random() * 20));
+      const ctx2 = document.getElementById("chart-monthly-line");
+      if (ctx2) new Chart(ctx2, {
+        type:"line",
+        data:{ labels:months, datasets:[{ label:"Attendance %", data:trendData, borderColor:"#2563eb", backgroundColor:"rgba(37,99,235,.15)", fill:true, tension:.4, pointBackgroundColor:"#2563eb", pointRadius:4 }] },
+        options:{ responsive:true, maintainAspectRatio:false, plugins:{ legend:{ labels:{ color:"#94a3b8", font:{ family:"Nunito" } } } }, scales:{ x:{ ticks:{ color:"#94a3b8" }, grid:{ display:false } }, y:{ min:0, max:100, ticks:{ color:"#94a3b8" }, grid:{ color:"rgba(255,255,255,.05)" } } } }
+      });
+    });
+  },
+
+  // ── MARK ATTENDANCE ────────────────────────────────────────────
+  async renderMarkAttendance() {
+    const pc = document.getElementById("page-content");
+    const { db, collection, getDocs, query, where, setDoc, doc, serverTimestamp } = window.FB;
+    const role = this.userProfile?.role;
+    const today = new Date().toISOString().split("T")[0];
+
+    // Load classes
+    let classes = [];
+    try {
+      const snap = await getDocs(collection(db, "classes"));
+      snap.forEach(d => classes.push({ id: d.id, ...d.data() }));
+    } catch(e) {}
+
+    // Filter for teacher
+    if (role !== "principal" && this.userProfile?.assignedClasses) {
+      classes = classes.filter(c => this.userProfile.assignedClasses.includes(c.id));
+    }
+
+    const classOptions = classes.map(c => `<option value="${c.id}">${c.name}</option>`).join("");
+
+    pc.innerHTML = `
+      <div class="section-header">
+        <h2><i class="fas fa-check-square" style="color:var(--blue-accent);margin-right:.5rem;"></i>Mark Attendance</h2>
+      </div>
+      <div class="glass card mb-4">
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:1rem;align-items:flex-end;">
+          <div class="input-group" style="margin-bottom:0;">
+            <label><i class="fas fa-school"></i> Class</label>
+            <select class="form-control" id="att-class-sel">${classOptions || '<option value="">— No classes —</option>'}</select>
+          </div>
+          <div class="input-group" style="margin-bottom:0;">
+            <label><i class="fas fa-calendar"></i> Date</label>
+            <input type="date" class="form-control" id="att-date-sel" value="${today}"/>
+          </div>
+          <button class="btn btn-primary" onclick="APP.loadStudentsForAtt()"><i class="fas fa-search"></i> Load Students</button>
+        </div>
+      </div>
+
+      <div id="att-summary-row" class="stats-grid hidden" style="grid-template-columns:repeat(auto-fit,minmax(140px,1fr));margin-bottom:1rem;"></div>
+
+      <div id="att-actions-bar" class="hidden" style="display:none;gap:.5rem;flex-wrap:wrap;margin-bottom:1rem;">
+        <button class="btn btn-success btn-sm" onclick="APP.markAll('Present')"><i class="fas fa-check-double"></i> All Present</button>
+        <button class="btn btn-danger  btn-sm" onclick="APP.markAll('Absent')"><i class="fas fa-times"></i> All Absent</button>
+        <button class="btn btn-primary btn-sm" onclick="APP.saveAttendance()"><i class="fas fa-save"></i> Save Attendance</button>
+        <button class="btn btn-outline btn-sm" onclick="APP.printAttendance()"><i class="fas fa-print"></i> Print</button>
+        <button class="btn btn-warning  btn-sm" onclick="APP.renderMonthlySummary(APP.currentAttClass)"><i class="fas fa-calendar-alt"></i> Monthly Summary</button>
+        <button class="btn btn-outline  btn-sm" onclick="APP.renderAttCalendar('','')" style="display:none"></button>
+      </div>
+
+      <div id="att-list-wrap"></div>`;
+  },
+
+  async loadStudentsForAtt() {
+    const classId = document.getElementById("att-class-sel")?.value;
+    const date    = document.getElementById("att-date-sel")?.value;
+    if (!classId || !date) { this.toast("Select a class and date", "warning"); return; }
+
+    const { db, collection, getDocs, query, where } = window.FB;
+    const wrap = document.getElementById("att-list-wrap");
+    wrap.innerHTML = '<div style="display:flex;justify-content:center;padding:2rem;"><div class="loader-ring"></div></div>';
+
+    let students = [];
+    try {
+      const snap = await getDocs(query(collection(db, "students"), where("classId","==",classId)));
+      snap.forEach(d => students.push({ id: d.id, ...d.data() }));
+      students.sort((a,b) => (a.indexNo||"").localeCompare(b.indexNo||""));
+    } catch(e) { this.toast("Error loading students: "+e.message,"error"); }
+
+    // Load existing records
+    let existing = {};
+    try {
+      const aSnap = await getDocs(query(collection(db,"attendance"), where("classId","==",classId), where("date","==",date)));
+      aSnap.forEach(d => { const r = d.data(); existing[r.studentId] = r.status; });
+    } catch(e) {}
+
+    this.currentAttClass = classId;
+    this.currentAttDate  = date;
+    this.currentStudents = students;
+    this.currentAttData  = {};
+    students.forEach(s => { this.currentAttData[s.id] = existing[s.id] || "Present"; });
+
+    // Summary
+    const sumRow = document.getElementById("att-summary-row");
+    sumRow.classList.remove("hidden");
+    const actBar = document.getElementById("att-actions-bar");
+    actBar.style.display = "flex"; actBar.classList.remove("hidden");
+
+    if (!students.length) {
+      wrap.innerHTML = `<div class="glass card empty-state"><i class="fas fa-user-graduate"></i><p>No students found for this class. Add students first.</p></div>`;
+      return;
+    }
+
+    this.renderAttGrid();
+    this.updateAttSummary();
+  },
+
+  renderAttGrid() {
+    const wrap = document.getElementById("att-list-wrap");
+    const s = this.currentStudents || [];
+    wrap.innerHTML = `<div class="glass card"><div class="att-grid" id="att-grid">${
+      s.map((st,i) => `
+        <div class="att-row" id="attrow-${st.id}">
+          <div class="att-num">${i+1}</div>
+          <div>
+            <div class="att-name">${st.name}</div>
+            <div class="att-gender" style="display:flex;gap:.4rem;align-items:center;">
+              <span>${st.indexNo||"—"}</span>
+              <span class="badge ${st.gender==="Male"?"badge-teacher":"badge-medical"}" style="font-size:.65rem;">${st.gender||"—"}</span>
+            </div>
+          </div>
+          <div class="att-status-btns">
+            ${["Present","Absent","Late","Medical"].map(status => `
+              <button class="att-status-btn ${status.toLowerCase()} ${this.currentAttData[st.id]===status?"active":""}"
+                onclick="APP.setAttStatus('${st.id}','${status}')">
+                ${status}
+              </button>`).join("")}
+          </div>
+        </div>`).join("")
+    }</div></div>`;
+  },
+
+  setAttStatus(studentId, status) {
+    this.currentAttData[studentId] = status;
+    const row = document.getElementById(`attrow-${studentId}`);
+    if (!row) return;
+    row.querySelectorAll(".att-status-btn").forEach(btn => {
+      btn.classList.toggle("active", btn.textContent.trim() === status);
+    });
+    this.updateAttSummary();
+  },
+
+  markAll(status) {
+    (this.currentStudents||[]).forEach(s => this.setAttStatus(s.id, status));
+  },
+
+  updateAttSummary() {
+    const data = this.currentAttData || {};
+    let present=0, absent=0, late=0, medical=0, boys=0, girls=0, bPres=0, gPres=0;
+    (this.currentStudents||[]).forEach(s => {
+      const st = data[s.id];
+      if (st==="Present") present++;
+      if (st==="Absent")  absent++;
+      if (st==="Late")    late++;
+      if (st==="Medical") medical++;
+      if (s.gender==="Male")   { boys++;  if(st==="Present") bPres++; }
+      if (s.gender==="Female") { girls++; if(st==="Present") gPres++; }
+    });
+    const total = this.currentStudents?.length || 0;
+    const sumRow = document.getElementById("att-summary-row");
+    if (!sumRow) return;
+    sumRow.innerHTML = `
+      <div class="stat-card glass stat-green"><div class="stat-icon"><i class="fas fa-check"></i></div><div class="stat-value">${present}</div><div class="stat-label">Present</div></div>
+      <div class="stat-card glass stat-red"><div class="stat-icon"><i class="fas fa-times"></i></div><div class="stat-value">${absent}</div><div class="stat-label">Absent</div></div>
+      <div class="stat-card glass stat-orange"><div class="stat-icon"><i class="fas fa-clock"></i></div><div class="stat-value">${late}</div><div class="stat-label">Late</div></div>
+      <div class="stat-card glass stat-cyan"><div class="stat-icon"><i class="fas fa-heartbeat"></i></div><div class="stat-value">${medical}</div><div class="stat-label">Medical</div></div>
+      <div class="stat-card glass stat-blue"><div class="stat-icon"><i class="fas fa-mars"></i></div><div class="stat-value">${bPres}/${boys}</div><div class="stat-label">Boys Present</div></div>
+      <div class="stat-card glass stat-blue"><div class="stat-icon"><i class="fas fa-venus"></i></div><div class="stat-value">${gPres}/${girls}</div><div class="stat-label">Girls Present</div></div>`;
+  },
+
+  async saveAttendance() {
+    const { db, setDoc, doc, serverTimestamp } = window.FB;
+    const classId = this.currentAttClass;
+    const date    = this.currentAttDate;
+    const data    = this.currentAttData;
+    if (!classId || !date || !data) { this.toast("Nothing to save","warning"); return; }
+
+    this.toast("Saving attendance...","info");
+    try {
+      const promises = Object.entries(data).map(([studentId, status]) => {
+        const student = (this.currentStudents||[]).find(s => s.id === studentId);
+        return setDoc(doc(db, "attendance", `${date}_${studentId}`), {
+          studentId, classId, date, status,
+          studentName: student?.name || "",
+          gender: student?.gender || "",
+          updatedAt: serverTimestamp(),
+          markedBy: this.currentUser?.email || ""
+        });
+      });
+      await Promise.all(promises);
+      this.toast("Attendance saved successfully!", "success");
+    } catch(e) { this.toast("Save failed: "+e.message,"error"); }
+  },
+
+  printAttendance() {
+    const date = this.currentAttDate;
+    const classId = this.currentAttClass;
+    let rows = (this.currentStudents||[]).map((s,i) => `
+      <tr><td>${i+1}</td><td>${s.name}</td><td>${s.indexNo||"—"}</td><td>${s.gender||"—"}</td><td style="font-weight:700;color:${this.currentAttData[s.id]==="Present"?"green":this.currentAttData[s.id]==="Absent"?"red":"orange"}">${this.currentAttData[s.id]||"—"}</td></tr>`).join("");
+    const w = window.open("","_blank");
+    w.document.write(`<html><head><title>Attendance - ${date}</title>
+      <style>body{font-family:sans-serif;padding:2rem;}table{width:100%;border-collapse:collapse;}th,td{border:1px solid #ccc;padding:.5rem .75rem;font-size:.85rem;}th{background:#1a3a8f;color:#fff;}h2{margin-bottom:.5rem;}p{color:#555;margin-bottom:1rem;}</style></head>
+      <body><h2>BD/Hindu College Welimada</h2><p>Date: ${date} | Class: ${classId}</p>
+      <table><thead><tr><th>#</th><th>Name</th><th>Index</th><th>Gender</th><th>Status</th></tr></thead><tbody>${rows}</tbody></table>
+      <script>window.print();<\/script></body></html>`);
+    w.document.close();
+  },
+
+  // ── ATTENDANCE HISTORY ─────────────────────────────────────────
+  async renderAttHistory() {
+    const pc = document.getElementById("page-content");
+    const { db, collection, getDocs, query, where, orderBy } = window.FB;
+    const today = new Date().toISOString().split("T")[0];
+    const sevenAgo = new Date(Date.now()-7*86400000).toISOString().split("T")[0];
+
+    let records = [];
+    try {
+      const snap = await getDocs(query(collection(db,"attendance"), where("date",">=",sevenAgo)));
+      snap.forEach(d => records.push(d.data()));
+      records.sort((a,b) => b.date.localeCompare(a.date));
+    } catch(e) {}
+
+    const rows = records.length ? records.slice(0,200).map(r => `
+      <tr>
+        <td>${r.date}</td>
+        <td><strong>${r.studentName||"—"}</strong></td>
+        <td>${r.classId||"—"}</td>
+        <td><span class="badge badge-${r.status?.toLowerCase()||"absent"}">${r.status||"—"}</span></td>
+        <td>${r.markedBy||"—"}</td>
+      </tr>`).join("") : `<tr><td colspan="5" class="text-center" style="padding:2rem;color:var(--text-muted);">No records found</td></tr>`;
+
+    pc.innerHTML = `
+      <div class="section-header">
+        <h2>Attendance History</h2>
+        <div class="flex gap-3">
+          <div class="search-bar"><i class="fas fa-search"></i><input type="text" class="form-control" placeholder="Search students..." oninput="APP.filterHistoryTable(this.value)"/></div>
+        </div>
+      </div>
+      <div class="glass card">
+        <div class="table-wrapper">
+          <table id="hist-table">
+            <thead><tr><th>Date</th><th>Student</th><th>Class</th><th>Status</th><th>Marked By</th></tr></thead>
+            <tbody>${rows}</tbody>
+          </table>
+        </div>
+      </div>`;
+  },
+
+  filterHistoryTable(val) {
+    const t = document.getElementById("hist-table");
+    if (!t) return;
+    const q = val.toLowerCase();
+    t.querySelectorAll("tbody tr").forEach(r => {
+      r.style.display = r.textContent.toLowerCase().includes(q) ? "" : "none";
+    });
+  },
+
+  // ── REPORTS ────────────────────────────────────────────────────
+  async renderReports() {
+    const pc = document.getElementById("page-content");
+    pc.innerHTML = `
+      <div class="section-header"><h2>Attendance Reports</h2></div>
+      <div class="glass card mb-4">
+        <h3 style="font-size:.9rem;font-weight:800;margin-bottom:1rem;">Generate Report</h3>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:1rem;align-items:flex-end;">
+          <div class="input-group" style="margin-bottom:0;">
+            <label>From Date</label>
+            <input type="date" class="form-control" id="rep-from"/>
+          </div>
+          <div class="input-group" style="margin-bottom:0;">
+            <label>To Date</label>
+            <input type="date" class="form-control" id="rep-to"/>
+          </div>
+          <div class="input-group" style="margin-bottom:0;">
+            <label>Class (Optional)</label>
+            <input type="text" class="form-control" id="rep-class" placeholder="All classes"/>
+          </div>
+          <button class="btn btn-primary" onclick="APP.generateReport()"><i class="fas fa-file-alt"></i> Generate</button>
+          <button class="btn btn-success" onclick="APP.downloadReportPDF()"><i class="fas fa-download"></i> Download PDF</button>
+        </div>
+      </div>
+      <div id="report-output"></div>`;
+
+    // Set defaults
+    const now = new Date();
+    const y = now.getFullYear(), m = String(now.getMonth()+1).padStart(2,"0");
+    document.getElementById("rep-from").value = `${y}-${m}-01`;
+    document.getElementById("rep-to").value = now.toISOString().split("T")[0];
+  },
+
+  async generateReport() {
+    const from  = document.getElementById("rep-from")?.value;
+    const to    = document.getElementById("rep-to")?.value;
+    if (!from||!to) { this.toast("Select date range","warning"); return; }
+    const { db, collection, getDocs, query, where } = window.FB;
+
+    const out = document.getElementById("report-output");
+    out.innerHTML = '<div style="display:flex;justify-content:center;padding:2rem;"><div class="loader-ring"></div></div>';
+
+    let records = [];
+    try {
+      const snap = await getDocs(query(collection(db,"attendance"), where("date",">=",from), where("date","<=",to)));
+      snap.forEach(d => records.push(d.data()));
+    } catch(e) {}
+
+    // Summarise by student
+    const summary = {};
+    records.forEach(r => {
+      if (!summary[r.studentId]) summary[r.studentId] = { name:r.studentName||"—", classId:r.classId||"—", present:0, absent:0, late:0, medical:0 };
+      const s = summary[r.studentId];
+      if (r.status==="Present") s.present++;
+      else if (r.status==="Absent") s.absent++;
+      else if (r.status==="Late") s.late++;
+      else if (r.status==="Medical") s.medical++;
+    });
+
+    const rows = Object.values(summary).map(s => {
+      const total = s.present+s.absent+s.late+s.medical;
+      const pct = total ? Math.round((s.present/total)*100) : 0;
+      const cls = pct>=85?"high":pct>=70?"medium":"low";
+      return `<tr>
+        <td><strong>${s.name}</strong></td>
+        <td>${s.classId}</td>
+        <td>${s.present}</td><td>${s.absent}</td><td>${s.late}</td><td>${s.medical}</td>
+        <td>
+          <div style="display:flex;align-items:center;gap:.5rem;">
+            <div class="progress-bar-wrap" style="width:80px;"><div class="progress-bar ${cls}" style="width:${pct}%"></div></div>
+            <strong>${pct}%</strong>
+          </div>
+        </td>
+      </tr>`;
+    }).join("");
+
+    out.innerHTML = `
+      <div class="glass card">
+        <div class="section-header">
+          <h3 style="font-size:.9rem;font-weight:800;">Report: ${from} → ${to} (${Object.keys(summary).length} students)</h3>
+        </div>
+        <div class="table-wrapper">
+          <table>
+            <thead><tr><th>Student</th><th>Class</th><th>Present</th><th>Absent</th><th>Late</th><th>Medical</th><th>Attendance %</th></tr></thead>
+            <tbody>${rows||`<tr><td colspan="7" class="text-center" style="padding:2rem;color:var(--text-muted);">No records</td></tr>`}</tbody>
+          </table>
+        </div>
+      </div>`;
+  },
+
+  downloadReportPDF() {
+    const t = document.querySelector("#report-output table");
+    if (!t) { this.toast("Generate a report first","warning"); return; }
+    const w = window.open("","_blank");
+    w.document.write(`<html><head><title>Attendance Report</title>
+      <style>body{font-family:sans-serif;padding:2rem;}table{width:100%;border-collapse:collapse;}th,td{border:1px solid #ccc;padding:.5rem;font-size:.82rem;}th{background:#1a3a8f;color:#fff;}h2{color:#1a3a8f;}</style></head>
+      <body><h2>BD/Hindu College Welimada — Attendance Report</h2>${t.outerHTML}
+      <script>window.print();<\/script></body></html>`);
+    w.document.close();
+  },
+
+  // ── STUDENTS ───────────────────────────────────────────────────
+  async renderStudents() {
+    const pc = document.getElementById("page-content");
+    const { db, collection, getDocs } = window.FB;
+
+    let students = [], classes = [];
+    try {
+      const [sSnap, cSnap] = await Promise.all([getDocs(collection(db,"students")), getDocs(collection(db,"classes"))]);
+      sSnap.forEach(d => students.push({ id:d.id, ...d.data() }));
+      cSnap.forEach(d => classes.push({ id:d.id, ...d.data() }));
+    } catch(e) {
+      pc.innerHTML = `<div class="glass card empty-state" style="margin-top:2rem;">
+        <i class="fas fa-database" style="color:var(--warning);opacity:.7;"></i>
+        <p style="color:var(--warning);font-weight:700;">Firestore not connected</p>
+        <p style="font-size:.82rem;margin-top:.3rem;">Paste your Firebase config at the top of the file, then reload.</p>
+        <button class="btn btn-warning btn-sm" style="margin-top:1rem;" onclick="APP.showSetupGuide()"><i class="fas fa-book-open"></i> Setup Guide</button>
+      </div>`;
+      return;
+    }
+
+    // Filter for teachers' assigned classes
+    if (this.userProfile?.role !== "principal" && this.userProfile?.assignedClasses?.length) {
+      students = students.filter(s => this.userProfile.assignedClasses.includes(s.classId));
+    }
+
+    const canManage = this.userProfile?.role === "principal" || this.userProfile?.permissions?.manageStudents;
+    const classOpts = classes.map(c => `<option value="${c.id}">${c.name}</option>`).join("");
+
+    // Sort students by class then name
+    students.sort((a,b) => (a.classId||"").localeCompare(b.classId||"") || (a.name||"").localeCompare(b.name||""));
+
+    pc.innerHTML = `
+      <div class="section-header">
+        <h2>Students <span style="color:var(--text-muted);font-weight:600;">(${students.length})</span></h2>
+        <div class="flex gap-3 items-center" style="flex-wrap:wrap;">
+          <div class="search-bar"><i class="fas fa-search"></i>
+            <input type="text" class="form-control" placeholder="Search name, index..." oninput="APP.filterStudentCards(this.value)"/>
+          </div>
+          ${classes.length > 1 ? `<select class="form-control" style="width:auto;padding:.5rem .9rem;font-size:.85rem;" onchange="APP.filterStudentsByClass(this.value)">
+            <option value="">All Classes</option>${classOpts}
+          </select>` : ""}
+          ${canManage ? `<button class="btn btn-primary btn-sm" onclick="APP.showAddStudentModal()"><i class="fas fa-user-plus"></i> Add Student</button>` : ""}
+        </div>
+      </div>
+      <div class="students-grid" id="students-grid">
+        ${students.length
+          ? students.map(s => this.studentCardHTML(s)).join("")
+          : `<div class="glass card empty-state" style="grid-column:1/-1;">
+              <i class="fas fa-user-graduate"></i>
+              <p style="font-weight:700;margin-bottom:.4rem;">No students yet</p>
+              <p style="font-size:.83rem;">${canManage ? 'Click <strong>Add Student</strong> to register the first student.' : 'No students assigned to your classes yet.'}</p>
+              ${canManage ? `<button class="btn btn-primary btn-sm" style="margin-top:1rem;" onclick="APP.showAddStudentModal()"><i class="fas fa-user-plus"></i> Add First Student</button>` : ""}
+            </div>`
+        }
+      </div>`;
+  },
+
+  studentCardHTML(s) {
+    const initials = (s.name||"S").split(" ").map(n=>n[0]).join("").toUpperCase().slice(0,2);
+    const canEdit = this.userProfile?.role === "principal" || this.userProfile?.permissions?.manageStudents;
+    return `
+      <div class="student-card glass" id="sc-${s.id}" data-class="${s.classId||""}">
+        <div class="student-card-top">
+          <div class="student-avatar">${s.photo ? `<img src="${s.photo}" alt="${s.name}"/>` : initials}</div>
+          <div class="student-info">
+            <h4>${s.name||"—"}</h4>
+            <p><i class="fas fa-id-card"></i> ${s.indexNo||"No Index"}</p>
+            <p><i class="fas fa-school"></i> ${s.classId||"No Class"}</p>
+          </div>
+        </div>
+        <div style="display:flex;gap:.4rem;flex-wrap:wrap;">
+          <span class="badge ${s.gender==="Male"?"badge-teacher":"badge-medical"}">${s.gender||"—"}</span>
+          ${s.dob ? `<span class="badge badge-absent"><i class="fas fa-birthday-cake"></i> ${s.dob}</span>` : ""}
+        </div>
+        ${s.parentPhone ? `<div style="font-size:.78rem;color:var(--text-muted);"><i class="fas fa-phone"></i> ${s.parentPhone}</div>` : ""}
+        <div class="td-actions">
+          <button class="btn btn-sm btn-primary" onclick="APP.showStudentProfile('${s.id}')"><i class="fas fa-eye"></i> Profile</button>
+          ${canEdit ? `
+          <button class="btn btn-sm btn-outline" onclick="APP.showEditStudentModal('${s.id}')"><i class="fas fa-edit"></i></button>
+          <button class="btn btn-sm btn-danger"  onclick="APP.deleteStudent('${s.id}')"><i class="fas fa-trash"></i></button>` : ""}
+        </div>
+      </div>`;
+  },
+
+  filterStudentCards(val) {
+    const q = val.toLowerCase();
+    document.querySelectorAll(".student-card").forEach(c => {
+      c.style.display = c.textContent.toLowerCase().includes(q) ? "" : "none";
+    });
+  },
+
+  filterStudentsByClass(classId) {
+    document.querySelectorAll(".student-card").forEach(c => {
+      c.style.display = (!classId || c.dataset.class === classId) ? "" : "none";
+    });
+  },
+
+  async showAddStudentModal() {
+    const { db, collection, getDocs } = window.FB;
+    let classes = [];
+    try { const s=await getDocs(collection(db,"classes")); s.forEach(d=>classes.push({id:d.id,...d.data()})); } catch(e) {}
+
+    const noClasses = classes.length === 0;
+    const clsOpts = classes.map(c=>`<option value="${c.id}">${c.name}</option>`).join("");
+
+    this.modal("➕ Add New Student", `
+      ${noClasses ? `<div style="background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.3);border-radius:10px;padding:.75rem 1rem;margin-bottom:1rem;font-size:.82rem;color:#fbbf24;">
+        <i class="fas fa-exclamation-triangle"></i> <strong>No classes found.</strong> You need to create at least one class first.
+        <button class="btn btn-warning btn-sm" style="margin-left:.5rem;" onclick="APP.closeModal();APP.navigate('classes');">
+          <i class="fas fa-plus"></i> Go to Classes
+        </button>
+      </div>` : ""}
+
+      <div class="input-group"><label>Full Name *</label>
+        <input type="text" class="form-control" id="ns-name" placeholder="e.g. Kamal Perera" autofocus/>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;">
+        <div class="input-group"><label>Index / Admission No.</label>
+          <input type="text" class="form-control" id="ns-index" placeholder="e.g. 2024001"/>
+        </div>
+        <div class="input-group"><label>Gender *</label>
+          <select class="form-control" id="ns-gender">
+            <option value="Male">Male</option>
+            <option value="Female">Female</option>
+          </select>
+        </div>
+      </div>
+      <div class="input-group"><label>Class *</label>
+        ${noClasses
+          ? `<input type="text" class="form-control" id="ns-class" placeholder="Type class name (e.g. Grade 7A)" />`
+          : `<select class="form-control" id="ns-class"><option value="">— Select Class —</option>${clsOpts}</select>`
+        }
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;">
+        <div class="input-group"><label>Date of Birth</label>
+          <input type="date" class="form-control" id="ns-dob"/>
+        </div>
+        <div class="input-group"><label>Admission Date</label>
+          <input type="date" class="form-control" id="ns-adm" value="${new Date().toISOString().split('T')[0]}"/>
+        </div>
+      </div>
+      <div class="input-group"><label>Address</label>
+        <input type="text" class="form-control" id="ns-addr" placeholder="Home address"/>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;">
+        <div class="input-group"><label>Parent / Guardian Name</label>
+          <input type="text" class="form-control" id="ns-parent"/>
+        </div>
+        <div class="input-group"><label>Parent Phone</label>
+          <input type="tel" class="form-control" id="ns-phone" placeholder="07X XXXXXXX"/>
+        </div>
+      </div>
+      <div class="input-group"><label>Notes</label>
+        <textarea class="form-control" id="ns-notes" rows="2" placeholder="Any extra notes..."></textarea>
+      </div>`,
+      `<button class="btn btn-outline" onclick="APP.closeModal()">Cancel</button>
+       <button class="btn btn-primary" onclick="APP.saveNewStudent()"><i class="fas fa-save"></i> Save Student</button>`
+    );
+    // Focus name field
+    setTimeout(()=>document.getElementById("ns-name")?.focus(), 150);
+  },
+
+  async saveNewStudent() {
+    const name    = document.getElementById("ns-name")?.value.trim();
+    const index   = document.getElementById("ns-index")?.value.trim();
+    const gender  = document.getElementById("ns-gender")?.value;
+    const classEl = document.getElementById("ns-class");
+    const classId = classEl?.value.trim();
+
+    if (!name)    { this.toast("Full name is required","warning"); document.getElementById("ns-name")?.focus(); return; }
+    if (!classId) { this.toast("Please select or enter a class","warning"); classEl?.focus(); return; }
+
+    const { db, collection, addDoc, doc, setDoc, getDocs, serverTimestamp } = window.FB;
+
+    // If class was typed (no classes existed), auto-create it
+    if (classEl.tagName === "INPUT") {
+      const existingSnap = await getDocs(collection(db,"classes")).catch(()=>null);
+      const exists = existingSnap?.docs?.some(d => d.id === classId.replace(/\s+/g,"").toLowerCase());
+      if (!exists) {
+        const cid = classId.replace(/\s+/g,"").toLowerCase();
+        try { await setDoc(doc(db,"classes",cid), { name: classId, createdAt: new Date().toISOString() }); }
+        catch(e) {}
+      }
+    }
+
+    try {
+      await addDoc(collection(db,"students"), {
+        name, indexNo: index, gender,
+        classId: classEl.tagName === "INPUT" ? classId.replace(/\s+/g,"").toLowerCase() : classId,
+        dob:         document.getElementById("ns-dob")?.value   || "",
+        admDate:     document.getElementById("ns-adm")?.value   || "",
+        address:     document.getElementById("ns-addr")?.value  || "",
+        parentName:  document.getElementById("ns-parent")?.value|| "",
+        parentPhone: document.getElementById("ns-phone")?.value || "",
+        notes:       document.getElementById("ns-notes")?.value || "",
+        createdAt: serverTimestamp()
+      });
+      this.toast(`✅ ${name} added successfully!`, "success");
+      this.closeModal();
+      this.renderStudents();
+    } catch(e) {
+      this.toast("Error saving student: " + e.message, "error");
+    }
+  },
+
+  async showEditStudentModal(id) {
+    const { db, doc, getDoc, collection, getDocs } = window.FB;
+    let s = null, classes = [];
+    try {
+      const [sSnap, cSnap] = await Promise.all([getDoc(doc(db,"students",id)), getDocs(collection(db,"classes"))]);
+      s = sSnap.data(); cSnap.forEach(d=>classes.push({id:d.id,...d.data()}));
+    } catch(e) { this.toast("Error loading student","error"); return; }
+    if (!s) return;
+
+    const clsOpts = classes.map(c=>`<option value="${c.id}" ${c.id===s.classId?"selected":""}>${c.name}</option>`).join("");
+    this.modal("Edit Student", `
+      <div class="input-group"><label>Full Name *</label><input type="text" class="form-control" id="es-name" value="${s.name||""}"/></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;">
+        <div class="input-group"><label>Index Number</label><input type="text" class="form-control" id="es-index" value="${s.indexNo||""}"/></div>
+        <div class="input-group"><label>Gender</label><select class="form-control" id="es-gender"><option ${s.gender==="Male"?"selected":""}>Male</option><option ${s.gender==="Female"?"selected":""}>Female</option></select></div>
+      </div>
+      <div class="input-group"><label>Class</label><select class="form-control" id="es-class">${clsOpts}</select></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;">
+        <div class="input-group"><label>Date of Birth</label><input type="date" class="form-control" id="es-dob" value="${s.dob||""}"/></div>
+        <div class="input-group"><label>Admission Date</label><input type="date" class="form-control" id="es-adm" value="${s.admDate||""}"/></div>
+      </div>
+      <div class="input-group"><label>Address</label><input type="text" class="form-control" id="es-addr" value="${s.address||""}"/></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;">
+        <div class="input-group"><label>Parent Name</label><input type="text" class="form-control" id="es-parent" value="${s.parentName||""}"/></div>
+        <div class="input-group"><label>Parent Phone</label><input type="tel" class="form-control" id="es-phone" value="${s.parentPhone||""}"/></div>
+      </div>`,
+      `<button class="btn btn-outline" onclick="APP.closeModal()">Cancel</button>
+       <button class="btn btn-primary" onclick="APP.saveEditStudent('${id}')"><i class="fas fa-save"></i> Save Changes</button>`
+    );
+  },
+
+  async saveEditStudent(id) {
+    const { db, doc, updateDoc } = window.FB;
+    try {
+      await updateDoc(doc(db,"students",id), {
+        name: document.getElementById("es-name")?.value.trim(),
+        indexNo: document.getElementById("es-index")?.value.trim(),
+        gender: document.getElementById("es-gender")?.value,
+        classId: document.getElementById("es-class")?.value,
+        dob: document.getElementById("es-dob")?.value,
+        admDate: document.getElementById("es-adm")?.value,
+        address: document.getElementById("es-addr")?.value,
+        parentName: document.getElementById("es-parent")?.value,
+        parentPhone: document.getElementById("es-phone")?.value,
+      });
+      this.toast("Student updated!","success");
+      this.closeModal();
+      this.renderStudents();
+    } catch(e) { this.toast("Error: "+e.message,"error"); }
+  },
+
+  async deleteStudent(id) {
+    if (!confirm("Delete this student? This cannot be undone.")) return;
+    const { db, doc, deleteDoc } = window.FB;
+    try { await deleteDoc(doc(db,"students",id)); this.toast("Student deleted","info"); this.renderStudents(); }
+    catch(e) { this.toast("Error: "+e.message,"error"); }
+  },
+
+  // ── TEACHERS ───────────────────────────────────────────────────
+  async renderTeachers() {
+    const pc = document.getElementById("page-content");
+    const teachers = window.AUTH.getTeachers();
+
+    pc.innerHTML = `
+      <div class="section-header">
+        <h2>Teacher Accounts (${teachers.length})</h2>
+        <button class="btn btn-primary btn-sm" onclick="APP.showAddTeacherModal()"><i class="fas fa-plus"></i> Add Teacher</button>
+      </div>
+      <div class="glass card" style="margin-bottom:1rem;padding:.9rem 1.25rem;display:flex;gap:.5rem;align-items:center;background:rgba(37,99,235,.08);border-color:rgba(37,99,235,.2);">
+        <i class="fas fa-info-circle" style="color:var(--blue-accent);"></i>
+        <span style="font-size:.82rem;color:var(--text-muted);">Teacher accounts are managed here. Passwords are stored locally in the browser. Teachers log in using their <strong style="color:var(--text-main);">username & password</strong> set below.</span>
+      </div>
+      <div class="glass card">
+        <div class="table-wrapper">
+          <table>
+            <thead><tr><th>Name</th><th>Username</th><th>Assigned Classes</th><th>Permissions</th><th>Actions</th></tr></thead>
+            <tbody>
+              ${teachers.length ? teachers.map(t => `
+                <tr>
+                  <td><strong>${t.name||"—"}</strong></td>
+                  <td><code style="font-size:.8rem;color:var(--sky);">${t.username||"—"}</code></td>
+                  <td>${(t.assignedClasses||[]).join(", ")||"None"}</td>
+                  <td>${Object.entries(t.permissions||{}).filter(([,v])=>v).map(([k])=>`<span class="badge badge-teacher" style="margin:.1rem;">${k}</span>`).join("")||"—"}</td>
+                  <td class="td-actions">
+                    <button class="btn btn-sm btn-outline" onclick="APP.showEditTeacherModal('${t.id}')"><i class="fas fa-edit"></i></button>
+                    <button class="btn btn-sm btn-danger"  onclick="APP.deleteTeacher('${t.id}')"><i class="fas fa-trash"></i></button>
+                  </td>
+                </tr>`).join("") : `<tr><td colspan="5" class="text-center" style="padding:2rem;color:var(--text-muted);">No teacher accounts created yet. Click <strong>Add Teacher</strong> to create one.</td></tr>`}
+            </tbody>
+          </table>
+        </div>
+      </div>`;
+  },
+
+  async showAddTeacherModal() {
+    const { db, collection, getDocs } = window.FB;
+    let classes = [];
+    try { const s=await getDocs(collection(db,"classes")); s.forEach(d=>classes.push({id:d.id,...d.data()})); } catch(e) {}
+
+    const clsChecks = classes.map(c=>`
+      <label class="perm-item">
+        <input type="checkbox" class="tc-class" value="${c.id}"> ${c.name}
+      </label>`).join("");
+
+    this.modal("Add Teacher Account", `
+      <div class="input-group"><label>Display Name *</label><input type="text" class="form-control" id="nt-name" placeholder="Mr. / Ms. Full Name"/></div>
+      <div class="input-group"><label>Username (for login) *</label><input type="text" class="form-control" id="nt-email" placeholder="e.g. teacher@whc.lk"/></div>
+      <div class="input-group"><label>Password *</label>
+        <div style="position:relative;">
+          <input type="password" class="form-control" id="nt-pass" placeholder="Set a password" style="padding-right:2.8rem;"/>
+          <button onclick="var i=document.getElementById('nt-pass');i.type=i.type==='password'?'text':'password';" style="position:absolute;right:.75rem;top:50%;transform:translateY(-50%);background:none;border:none;color:var(--text-muted);cursor:pointer;"><i class="fas fa-eye"></i></button>
+        </div>
+      </div>
+      <div class="input-group"><label>Assigned Classes</label>
+        <div class="perm-grid">${clsChecks||"<p style='color:var(--text-muted);font-size:.82rem;'>No classes created yet</p>"}</div>
+      </div>
+      <div class="input-group"><label>Permissions</label>
+        <div class="perm-grid">
+          <label class="perm-item"><input type="checkbox" id="pp-markAtt" checked> Mark Attendance</label>
+          <label class="perm-item"><input type="checkbox" id="pp-editAtt"> Edit Attendance</label>
+          <label class="perm-item"><input type="checkbox" id="pp-manageStudents"> Manage Students</label>
+          <label class="perm-item"><input type="checkbox" id="pp-viewHistory" checked> View History</label>
+          <label class="perm-item"><input type="checkbox" id="pp-viewReports"> View Reports</label>
+        </div>
+      </div>`,
+      `<button class="btn btn-outline" onclick="APP.closeModal()">Cancel</button>
+       <button class="btn btn-primary" onclick="APP.saveNewTeacher()"><i class="fas fa-save"></i> Save Teacher</button>`
+    );
+  },
+
+  async saveNewTeacher() {
+    const name  = document.getElementById("nt-name")?.value.trim();
+    const email = document.getElementById("nt-email")?.value.trim();
+    const pass  = document.getElementById("nt-pass")?.value;
+    if (!name||!email||!pass) { this.toast("Name, username, and password are required","warning"); return; }
+
+    const assignedClasses = [...document.querySelectorAll(".tc-class:checked")].map(c=>c.value);
+    const permissions = {
+      markAttendance:  document.getElementById("pp-markAtt")?.checked||false,
+      editAttendance:  document.getElementById("pp-editAtt")?.checked||false,
+      manageStudents:  document.getElementById("pp-manageStudents")?.checked||false,
+      viewHistory:     document.getElementById("pp-viewHistory")?.checked||false,
+      viewReports:     document.getElementById("pp-viewReports")?.checked||false,
+    };
+
+    const teachers = window.AUTH.getTeachers();
+    if (teachers.find(t => t.username === email)) { this.toast("Username already exists","warning"); return; }
+    const id = "t_" + Date.now();
+    teachers.push({ id, name, username: email, password: pass, role:"teacher", assignedClasses, permissions });
+    window.AUTH.saveTeachers(teachers);
+    this.toast("Teacher account created!","success");
+    this.closeModal();
+    this.renderTeachers();
+  },
+
+  async showEditTeacherModal(id) {
+    const teachers = window.AUTH.getTeachers();
+    const t = teachers.find(x => x.id === id);
+    if (!t) { this.toast("Teacher not found","error"); return; }
+
+    const { db, collection, getDocs } = window.FB;
+    let classes = [];
+    try { const s=await getDocs(collection(db,"classes")); s.forEach(d=>classes.push({id:d.id,...d.data()})); } catch(e) {}
+    const p = t.permissions||{};
+    const ac = t.assignedClasses||[];
+
+    const clsChecks = classes.map(c=>`
+      <label class="perm-item">
+        <input type="checkbox" class="etc-class" value="${c.id}" ${ac.includes(c.id)?"checked":""}> ${c.name}
+      </label>`).join("");
+
+    this.modal("Edit Teacher: "+t.name, `
+      <div class="input-group"><label>Display Name</label><input type="text" class="form-control" id="et-name" value="${t.name||""}"/></div>
+      <div class="input-group"><label>Username (login)</label><input type="text" class="form-control" id="et-email" value="${t.username||""}"/></div>
+      <div class="input-group"><label>New Password <span style="color:var(--text-muted);font-weight:400;">(leave blank to keep current)</span></label>
+        <input type="password" class="form-control" id="et-pass" placeholder="Enter new password to change"/>
+      </div>
+      <div class="input-group"><label>Assigned Classes</label>
+        <div class="perm-grid">${clsChecks||"<p style='color:var(--text-muted);font-size:.82rem;'>No classes created yet</p>"}</div>
+      </div>
+      <div class="input-group"><label>Permissions</label>
+        <div class="perm-grid">
+          <label class="perm-item"><input type="checkbox" id="ep-markAtt" ${p.markAttendance?"checked":""}> Mark Attendance</label>
+          <label class="perm-item"><input type="checkbox" id="ep-editAtt" ${p.editAttendance?"checked":""}> Edit Attendance</label>
+          <label class="perm-item"><input type="checkbox" id="ep-manageStudents" ${p.manageStudents?"checked":""}> Manage Students</label>
+          <label class="perm-item"><input type="checkbox" id="ep-viewHistory" ${p.viewHistory?"checked":""}> View History</label>
+          <label class="perm-item"><input type="checkbox" id="ep-viewReports" ${p.viewReports?"checked":""}> View Reports</label>
+        </div>
+      </div>`,
+      `<button class="btn btn-outline" onclick="APP.closeModal()">Cancel</button>
+       <button class="btn btn-primary" onclick="APP.saveEditTeacher('${id}')"><i class="fas fa-save"></i> Save Changes</button>`
+    );
+  },
+
+  async saveEditTeacher(id) {
+    const teachers = window.AUTH.getTeachers();
+    const idx = teachers.findIndex(x => x.id === id);
+    if (idx === -1) { this.toast("Teacher not found","error"); return; }
+
+    const newPass = document.getElementById("et-pass")?.value;
+    const assignedClasses = [...document.querySelectorAll(".etc-class:checked")].map(c=>c.value);
+    const permissions = {
+      markAttendance:  document.getElementById("ep-markAtt")?.checked||false,
+      editAttendance:  document.getElementById("ep-editAtt")?.checked||false,
+      manageStudents:  document.getElementById("ep-manageStudents")?.checked||false,
+      viewHistory:     document.getElementById("ep-viewHistory")?.checked||false,
+      viewReports:     document.getElementById("ep-viewReports")?.checked||false,
+    };
+
+    teachers[idx] = {
+      ...teachers[idx],
+      name: document.getElementById("et-name")?.value.trim() || teachers[idx].name,
+      username: document.getElementById("et-email")?.value.trim() || teachers[idx].username,
+      password: newPass || teachers[idx].password,
+      assignedClasses, permissions
+    };
+    window.AUTH.saveTeachers(teachers);
+    this.toast("Teacher updated!","success");
+    this.closeModal();
+    this.renderTeachers();
+  },
+
+  async deleteTeacher(id) {
+    if (!confirm("Delete this teacher account? They will no longer be able to log in.")) return;
+    const teachers = window.AUTH.getTeachers().filter(t => t.id !== id);
+    window.AUTH.saveTeachers(teachers);
+    this.toast("Teacher removed","info");
+    this.renderTeachers();
+  },
+
+  // ── CLASSES ────────────────────────────────────────────────────
+  async renderClasses() {
+    const pc = document.getElementById("page-content");
+    const { db, collection, getDocs } = window.FB;
+
+    let classes = [];
+    try { const snap = await getDocs(collection(db,"classes")); snap.forEach(d=>classes.push({id:d.id,...d.data()})); } catch(e) {}
+
+    // Auto-seed default classes if none exist
+    if (classes.length === 0) {
+      const defaults = ["Grade 6","Grade 7A","Grade 7B","Grade 7E","Grade 8A","Grade 8B","Grade 9A","Grade 9B","Grade 10A","Grade 10B","Grade 11"];
+      this.toast("Seeding default classes...","info");
+      const { db:db2, doc, setDoc } = window.FB;
+      for (const name of defaults) {
+        const id = name.replace(/\s+/g,"").toLowerCase();
+        try { await setDoc(doc(db2,"classes",id), { name, createdAt:new Date().toISOString() }); classes.push({id,name}); } catch(e) {}
+      }
+      this.toast("Default classes created!","success");
+    }
+
+    pc.innerHTML = `
+      <div class="section-header">
+        <h2>Class Management</h2>
+        <button class="btn btn-primary btn-sm" onclick="APP.showAddClassModal()"><i class="fas fa-plus"></i> Add Class</button>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:1rem;">
+        ${classes.map(c=>`
+          <div class="glass card" style="display:flex;flex-direction:column;gap:.75rem;">
+            <div style="display:flex;align-items:center;gap:.75rem;">
+              <div style="width:42px;height:42px;border-radius:12px;background:linear-gradient(135deg,var(--blue-light),var(--cyan));display:flex;align-items:center;justify-content:center;font-size:1.2rem;">🏫</div>
+              <div>
+                <h4 style="font-size:.95rem;font-weight:800;">${c.name}</h4>
+                <p style="font-size:.72rem;color:var(--text-muted);">ID: ${c.id}</p>
+              </div>
+            </div>
+            <div class="td-actions">
+              <button class="btn btn-sm btn-outline" onclick="APP.showRenameClassModal('${c.id}','${c.name}')"><i class="fas fa-edit"></i> Rename</button>
+              <button class="btn btn-sm btn-danger" onclick="APP.deleteClass('${c.id}')"><i class="fas fa-trash"></i></button>
+            </div>
+          </div>`).join("")}
+      </div>`;
+  },
+
+  showAddClassModal() {
+    this.modal("Add New Class", `
+      <div class="input-group"><label>Class Name *</label><input type="text" class="form-control" id="nc-name" placeholder="e.g. Grade 12A"/></div>`,
+      `<button class="btn btn-outline" onclick="APP.closeModal()">Cancel</button>
+       <button class="btn btn-primary" onclick="APP.saveNewClass()"><i class="fas fa-save"></i> Add Class</button>`
+    );
+  },
+
+  async saveNewClass() {
+    const name = document.getElementById("nc-name")?.value.trim();
+    if (!name) { this.toast("Class name required","warning"); return; }
+    const id = name.replace(/\s+/g,"").toLowerCase();
+    const { db, doc, setDoc } = window.FB;
+    try {
+      await setDoc(doc(db,"classes",id), { name, createdAt:new Date().toISOString() });
+      this.toast("Class added!","success"); this.closeModal(); this.renderClasses();
+    } catch(e) { this.toast("Error: "+e.message,"error"); }
+  },
+
+  showRenameClassModal(id, currentName) {
+    this.modal("Rename Class", `
+      <div class="input-group"><label>New Name *</label><input type="text" class="form-control" id="rc-name" value="${currentName}"/></div>`,
+      `<button class="btn btn-outline" onclick="APP.closeModal()">Cancel</button>
+       <button class="btn btn-primary" onclick="APP.saveRenameClass('${id}')"><i class="fas fa-save"></i> Rename</button>`
+    );
+  },
+
+  async saveRenameClass(id) {
+    const name = document.getElementById("rc-name")?.value.trim();
+    if (!name) { this.toast("Name required","warning"); return; }
+    const { db, doc, updateDoc } = window.FB;
+    try {
+      await updateDoc(doc(db,"classes",id), { name });
+      this.toast("Renamed!","success"); this.closeModal(); this.renderClasses();
+    } catch(e) { this.toast("Error: "+e.message,"error"); }
+  },
+
+  async deleteClass(id) {
+    if (!confirm("Delete this class?")) return;
+    const { db, doc, deleteDoc } = window.FB;
+    try { await deleteDoc(doc(db,"classes",id)); this.toast("Class deleted","info"); this.renderClasses(); }
+    catch(e) { this.toast("Error: "+e.message,"error"); }
+  },
+
+  // ── SETTINGS ───────────────────────────────────────────────────
+  renderSettings() {
+    const pc = document.getElementById("page-content");
+    const u = this.userProfile || {};
+    const principal = window.AUTH.getPrincipal();
+    pc.innerHTML = `
+      <div class="section-header"><h2>System Settings</h2></div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:1rem;">
+
+        <div class="glass card">
+          <h3 style="font-size:.95rem;font-weight:800;margin-bottom:1rem;"><i class="fas fa-user-cog" style="color:var(--blue-accent);margin-right:.5rem;"></i>Principal Credentials</h3>
+          <div class="input-group"><label>Display Name</label><input type="text" class="form-control" id="set-name" value="${u.name||""}"/></div>
+          <div class="input-group"><label>Username (login)</label><input type="text" class="form-control" id="set-username" value="${principal.username||""}"/></div>
+          <div class="input-group"><label>New Password <span style="color:var(--text-muted);font-weight:400;">(leave blank to keep)</span></label>
+            <input type="password" class="form-control" id="set-newpass" placeholder="Enter new password to change"/>
+          </div>
+          <div class="input-group"><label>Confirm New Password</label>
+            <input type="password" class="form-control" id="set-newpass2" placeholder="Confirm new password"/>
+          </div>
+          <button class="btn btn-primary btn-sm" onclick="APP.saveProfileSettings()"><i class="fas fa-save"></i> Save Changes</button>
+        </div>
+
+        <div class="glass card">
+          <h3 style="font-size:.95rem;font-weight:800;margin-bottom:1rem;"><i class="fas fa-palette" style="color:var(--cyan);margin-right:.5rem;"></i>Appearance</h3>
+          <div style="display:flex;align-items:center;justify-content:space-between;padding:.75rem 0;border-bottom:1px solid var(--glass-border);">
+            <span>Dark Mode</span>
+            <button class="btn btn-sm ${this.darkMode?"btn-primary":"btn-outline"}" onclick="APP.toggleTheme();APP.renderSettings();">
+              <i class="fas fa-${this.darkMode?"moon":"sun"}"></i> ${this.darkMode?"ON":"OFF"}
+            </button>
+          </div>
+        </div>
+
+        <div class="glass card">
+          <h3 style="font-size:.95rem;font-weight:800;margin-bottom:1rem;"><i class="fas fa-database" style="color:var(--warning);margin-right:.5rem;"></i>Data Management</h3>
+          <p style="font-size:.82rem;color:var(--text-muted);margin-bottom:1rem;">Export or manage system data. Use with caution.</p>
+          <div style="display:flex;gap:.5rem;flex-wrap:wrap;">
+            <button class="btn btn-outline btn-sm" onclick="APP.exportData()"><i class="fas fa-download"></i> Export Data</button>
+            <button class="btn btn-danger  btn-sm" onclick="APP.confirmClearData()"><i class="fas fa-trash"></i> Clear All Data</button>
+          </div>
+        </div>
+
+        <div class="glass card">
+          <h3 style="font-size:.95rem;font-weight:800;margin-bottom:1rem;"><i class="fas fa-book" style="color:var(--success);margin-right:.5rem;"></i>Setup Guide</h3>
+          <p style="font-size:.82rem;color:var(--text-muted);margin-bottom:1rem;">Step-by-step Firestore setup instructions.</p>
+          <button class="btn btn-success btn-sm" onclick="APP.showSetupGuide()"><i class="fas fa-book-open"></i> View Setup Guide</button>
+        </div>
+
+        <div class="glass card">
+          <h3 style="font-size:.95rem;font-weight:800;margin-bottom:1rem;"><i class="fas fa-shield-alt" style="color:var(--danger);margin-right:.5rem;"></i>Session Info</h3>
+          <p style="font-size:.8rem;color:var(--text-muted);line-height:1.9;">
+            <i class="fas fa-user"></i> Logged in as: <strong>${u.name||"—"}</strong><br>
+            <i class="fas fa-at"></i> Username: <code style="font-size:.75rem;color:var(--sky);">${this.currentUser?.email||"—"}</code><br>
+            <i class="fas fa-key"></i> Role: <span class="badge badge-admin">${u.role||"—"}</span>
+          </p>
+          <p style="font-size:.77rem;margin-top:.75rem;background:rgba(16,185,129,.08);border:1px solid rgba(16,185,129,.2);border-radius:8px;padding:.6rem .85rem;color:#34d399;">
+            <i class="fas fa-check-circle"></i> No Firebase Authentication — login is handled locally, no billing.
+          </p>
+        </div>
+      </div>`;
+  },
+
+  saveProfileSettings() {
+    const name     = document.getElementById("set-name")?.value.trim();
+    const username = document.getElementById("set-username")?.value.trim();
+    const newPass  = document.getElementById("set-newpass")?.value;
+    const newPass2 = document.getElementById("set-newpass2")?.value;
+    if (!name) { this.toast("Name required","warning"); return; }
+    if (!username) { this.toast("Username required","warning"); return; }
+    if (newPass && newPass !== newPass2) { this.toast("Passwords do not match","error"); return; }
+
+    const principal = window.AUTH.getPrincipal();
+    principal.name     = name;
+    principal.username = username;
+    if (newPass) principal.password = newPass;
+    window.AUTH.savePrincipal(principal);
+
+    // Update current session
+    this.userProfile.name = name;
+    this.currentUser.name = name;
+    this.currentUser.email = username;
+    window.AUTH.setSession(this.currentUser);
+    document.getElementById("sb-name").textContent = name;
+    document.getElementById("sb-avatar").textContent = name[0].toUpperCase();
+    this.toast("Credentials updated! Use new username/password next login.","success");
+    this.renderSettings();
+  },
+
+  async exportData() {
+    this.toast("Preparing export...","info");
+    const { db, collection, getDocs } = window.FB;
+    try {
+      const [sSnap, aSnap, cSnap] = await Promise.all([
+        getDocs(collection(db,"students")),
+        getDocs(collection(db,"attendance")),
+        getDocs(collection(db,"classes")),
+      ]);
+      const data = {
+        exportedAt: new Date().toISOString(),
+        students:   sSnap.docs.map(d=>({id:d.id,...d.data()})),
+        attendance: aSnap.docs.map(d=>({id:d.id,...d.data()})),
+        classes:    cSnap.docs.map(d=>({id:d.id,...d.data()})),
+      };
+      const blob = new Blob([JSON.stringify(data,null,2)], {type:"application/json"});
+      const url  = URL.createObjectURL(blob);
+      const a = document.createElement("a"); a.href=url; a.download=`whc-export-${new Date().toISOString().split("T")[0]}.json`; a.click();
+      this.toast("Export ready!","success");
+    } catch(e) { this.toast("Error: "+e.message,"error"); }
+  },
+
+  confirmClearData() {
+    if (!confirm("⚠️ This will delete ALL student and attendance data permanently. Are you absolutely sure?")) return;
+    if (!confirm("Second confirmation: This CANNOT be undone. Continue?")) return;
+    this.toast("Clear feature disabled in this demo for safety","warning");
+  },
+
+  // ================================================================
+  // ATTENDANCE CALENDAR (monthly view per student)
+  // ================================================================
+  async renderAttCalendar(studentId, studentName) {
+    const now  = new Date();
+    const year = now.getFullYear();
+    const month= now.getMonth(); // 0-indexed
+
+    const { db, collection, query, where, getDocs } = window.FB;
+    const from = `${year}-${String(month+1).padStart(2,"0")}-01`;
+    const to   = `${year}-${String(month+1).padStart(2,"0")}-31`;
+
+    let records = {};
+    try {
+      const snap = await getDocs(query(
+        collection(db,"attendance"),
+        where("studentId","==",studentId),
+        where("date",">=",from),
+        where("date","<=",to)
+      ));
+      snap.forEach(d => { const r=d.data(); records[r.date]=r.status; });
+    } catch(e) {}
+
+    const daysInMonth = new Date(year,month+1,0).getDate();
+    const firstDay    = new Date(year,month,1).getDay(); // 0=Sun
+    const monthName   = now.toLocaleString("default",{month:"long"});
+
+    const statusColor = { Present:"var(--success)", Absent:"var(--danger)", Late:"var(--late)", Medical:"var(--cyan)" };
+    const statusIcon  = { Present:"✓", Absent:"✗", Late:"⏰", Medical:"❤" };
+
+    // Build grid cells
+    let cells = "";
+    for (let i=0;i<firstDay;i++) cells += `<div></div>`;
+    for (let d=1;d<=daysInMonth;d++) {
+      const dateStr = `${year}-${String(month+1).padStart(2,"0")}-${String(d).padStart(2,"0")}`;
+      const status  = records[dateStr];
+      const color   = status ? statusColor[status] : "rgba(255,255,255,.06)";
+      const icon    = status ? statusIcon[status] : "";
+      cells += `<div style="
+        aspect-ratio:1; border-radius:10px;
+        background:${color}22; border:1px solid ${color}55;
+        display:flex; flex-direction:column; align-items:center; justify-content:center;
+        font-size:.75rem; font-weight:700; color:${status?color:"var(--text-muted)"};
+        transition:all .2s;" title="${status||"No record"}">
+        <span style="font-size:.65rem;">${d}</span>
+        <span style="font-size:.8rem;">${icon}</span>
+      </div>`;
+    }
+
+    // Count stats
+    const present = Object.values(records).filter(v=>v==="Present").length;
+    const absent  = Object.values(records).filter(v=>v==="Absent").length;
+    const late    = Object.values(records).filter(v=>v==="Late").length;
+    const medical = Object.values(records).filter(v=>v==="Medical").length;
+    const total   = present+absent+late+medical;
+    const pct     = total ? Math.round((present/total)*100) : 0;
+
+    this.modal(`📅 Calendar — ${studentName}`, `
+      <div style="text-align:center;margin-bottom:1rem;">
+        <h3 style="font-size:1rem;font-weight:800;">${monthName} ${year}</h3>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:4px;margin-bottom:.75rem;">
+        ${["S","M","T","W","T","F","S"].map(d=>`<div style="text-align:center;font-size:.68rem;font-weight:800;color:var(--text-muted);padding:.25rem 0;">${d}</div>`).join("")}
+        ${cells}
+      </div>
+      <div style="display:flex;gap:.5rem;flex-wrap:wrap;justify-content:center;margin-top:.75rem;">
+        <span class="badge badge-present"><span style="font-size:.9rem;">✓</span> Present: ${present}</span>
+        <span class="badge badge-absent"><span style="font-size:.9rem;">✗</span> Absent: ${absent}</span>
+        <span class="badge badge-late">⏰ Late: ${late}</span>
+        <span class="badge badge-medical">❤ Medical: ${medical}</span>
+      </div>
+      <div style="margin-top:1rem;">
+        <div style="display:flex;justify-content:space-between;margin-bottom:.35rem;">
+          <span style="font-size:.8rem;font-weight:700;">Monthly Attendance</span>
+          <span style="font-size:.8rem;font-weight:800;color:${pct>=85?"var(--success)":pct>=70?"var(--warning)":"var(--danger)"};">${pct}%</span>
+        </div>
+        <div class="progress-bar-wrap">
+          <div class="progress-bar ${pct>=85?"high":pct>=70?"medium":"low"}" style="width:${pct}%"></div>
+        </div>
+      </div>`, ``);
+  },
+
+  // ================================================================
+  // STUDENT FULL PROFILE VIEW
+  // ================================================================
+  async showStudentProfile(studentId) {
+    const { db, doc, getDoc, collection, query, where, getDocs } = window.FB;
+    let s = null;
+    try { const snap = await getDoc(doc(db,"students",studentId)); s = snap.data(); } catch(e) {}
+    if (!s) { this.toast("Student not found","error"); return; }
+
+    // Get last 30 attendance records
+    const today = new Date().toISOString().split("T")[0];
+    const ago30 = new Date(Date.now()-30*86400000).toISOString().split("T")[0];
+    let records = [], present=0, absent=0, late=0;
+    try {
+      const snap = await getDocs(query(collection(db,"attendance"),where("studentId","==",studentId),where("date",">=",ago30)));
+      snap.forEach(d => { const r=d.data(); records.push(r);
+        if(r.status==="Present") present++;
+        else if(r.status==="Absent") absent++;
+        else if(r.status==="Late") late++;
+      });
+      records.sort((a,b)=>b.date.localeCompare(a.date));
+    } catch(e) {}
+
+    const total = present+absent+late;
+    const pct   = total ? Math.round((present/total)*100) : 0;
+    const initials = (s.name||"S").split(" ").map(n=>n[0]).join("").toUpperCase().slice(0,2);
+
+    this.modal(`Student Profile`, `
+      <div style="text-align:center;margin-bottom:1.25rem;">
+        <div style="width:80px;height:80px;border-radius:20px;background:linear-gradient(135deg,var(--blue-light),var(--cyan));
+          display:flex;align-items:center;justify-content:center;font-size:2rem;font-weight:800;color:#fff;
+          margin:0 auto .75rem;">${s.photo?`<img src="${s.photo}" style="width:100%;height:100%;object-fit:cover;border-radius:20px;" />`:`${initials}`}</div>
+        <h3 style="font-size:1.1rem;font-weight:800;">${s.name||"—"}</h3>
+        <div style="display:flex;gap:.5rem;justify-content:center;margin-top:.4rem;flex-wrap:wrap;">
+          <span class="badge ${s.gender==="Male"?"badge-teacher":"badge-medical"}">${s.gender||"—"}</span>
+          <span class="badge badge-admin">${s.classId||"—"}</span>
+          <span class="badge badge-absent">#${s.indexNo||"—"}</span>
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:.6rem;margin-bottom:1rem;font-size:.82rem;">
+        <div class="glass" style="padding:.65rem .85rem;border-radius:10px;"><div style="color:var(--text-muted);font-size:.7rem;font-weight:700;text-transform:uppercase;">Date of Birth</div><div style="font-weight:700;margin-top:.2rem;">${s.dob||"—"}</div></div>
+        <div class="glass" style="padding:.65rem .85rem;border-radius:10px;"><div style="color:var(--text-muted);font-size:.7rem;font-weight:700;text-transform:uppercase;">Admission</div><div style="font-weight:700;margin-top:.2rem;">${s.admDate||"—"}</div></div>
+        <div class="glass" style="padding:.65rem .85rem;border-radius:10px;grid-column:1/-1;"><div style="color:var(--text-muted);font-size:.7rem;font-weight:700;text-transform:uppercase;">Address</div><div style="font-weight:700;margin-top:.2rem;">${s.address||"—"}</div></div>
+        <div class="glass" style="padding:.65rem .85rem;border-radius:10px;"><div style="color:var(--text-muted);font-size:.7rem;font-weight:700;text-transform:uppercase;">Parent</div><div style="font-weight:700;margin-top:.2rem;">${s.parentName||"—"}</div></div>
+        <div class="glass" style="padding:.65rem .85rem;border-radius:10px;"><div style="color:var(--text-muted);font-size:.7rem;font-weight:700;text-transform:uppercase;">Phone</div><div style="font-weight:700;margin-top:.2rem;">${s.parentPhone||"—"}</div></div>
+      </div>
+      <div style="margin-bottom:1rem;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.5rem;">
+          <span style="font-size:.82rem;font-weight:700;">30-Day Attendance</span>
+          <span style="font-weight:800;color:${pct>=85?"var(--success)":pct>=70?"var(--warning)":"var(--danger)"};">${pct}%</span>
+        </div>
+        <div class="progress-bar-wrap"><div class="progress-bar ${pct>=85?"high":pct>=70?"medium":"low"}" style="width:${pct}%"></div></div>
+        <div style="display:flex;gap:.5rem;margin-top:.5rem;flex-wrap:wrap;">
+          <span class="badge badge-present">✓ ${present} Present</span>
+          <span class="badge badge-absent">✗ ${absent} Absent</span>
+          <span class="badge badge-late">⏰ ${late} Late</span>
+        </div>
+      </div>
+      <div>
+        <div style="font-size:.78rem;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:.5rem;">Recent Records</div>
+        <div style="max-height:160px;overflow-y:auto;display:flex;flex-direction:column;gap:.35rem;">
+          ${records.slice(0,15).map(r=>`
+            <div style="display:flex;justify-content:space-between;align-items:center;padding:.4rem .7rem;border-radius:8px;background:var(--glass-bg);font-size:.8rem;">
+              <span style="color:var(--text-muted);">${r.date}</span>
+              <span class="badge badge-${r.status?.toLowerCase()||"absent"}">${r.status||"—"}</span>
+            </div>`).join("")||`<div style="color:var(--text-muted);font-size:.82rem;text-align:center;padding:1rem;">No records</div>`}
+        </div>
+      </div>`,
+      `<button class="btn btn-outline" onclick="APP.closeModal()">Close</button>
+       <button class="btn btn-primary" onclick="APP.closeModal();APP.renderAttCalendar('${studentId}','${s.name}')"><i class="fas fa-calendar"></i> View Calendar</button>`
+    );
+  },
+
+  // ================================================================
+  // NOTIFICATIONS PANEL
+  // ================================================================
+  notifications: [],
+
+  async loadNotifications() {
+    const { db, collection, query, where, getDocs } = window.FB;
+    const today = new Date().toISOString().split("T")[0];
+    this.notifications = [];
+    try {
+      // Students with <75% this month
+      const ago30 = new Date(Date.now()-30*86400000).toISOString().split("T")[0];
+      const aSnap = await getDocs(query(collection(db,"attendance"),where("date",">=",ago30)));
+      const byStudent = {};
+      aSnap.forEach(d => {
+        const r=d.data();
+        if(!byStudent[r.studentId]) byStudent[r.studentId]={name:r.studentName,present:0,total:0};
+        byStudent[r.studentId].total++;
+        if(r.status==="Present"||r.status==="Late") byStudent[r.studentId].present++;
+      });
+      Object.entries(byStudent).forEach(([id,s]) => {
+        const pct = s.total ? Math.round((s.present/s.total)*100) : 0;
+        if(pct<75) this.notifications.push({ type:"warning", icon:"fas fa-exclamation-triangle", msg:`${s.name} has low attendance: ${pct}%`, time:"30-day report" });
+      });
+    } catch(e) {}
+    return this.notifications;
+  },
+
+  async showNotificationsPanel() {
+    await this.loadNotifications();
+    const n = this.notifications;
+    this.modal("🔔 Notifications", `
+      ${n.length === 0
+        ? `<div class="empty-state"><i class="fas fa-bell-slash"></i><p>No notifications at this time</p></div>`
+        : n.map(item=>`
+          <div style="display:flex;gap:.75rem;align-items:flex-start;padding:.75rem;border-radius:10px;background:var(--glass-bg);border:1px solid var(--glass-border);margin-bottom:.5rem;">
+            <i class="${item.icon}" style="color:var(--warning);margin-top:2px;"></i>
+            <div>
+              <div style="font-size:.85rem;font-weight:700;">${item.msg}</div>
+              <div style="font-size:.72rem;color:var(--text-muted);">${item.time}</div>
+            </div>
+          </div>`).join("")
+      }`, ``
+    );
+  },
+
+  // ================================================================
+  // MONTHLY SUMMARY (auto-generated)
+  // ================================================================
+  async renderMonthlySummary(classId) {
+    const now   = new Date();
+    const year  = now.getFullYear();
+    const month = now.getMonth()+1;
+    const from  = `${year}-${String(month).padStart(2,"0")}-01`;
+    const to    = `${year}-${String(month).padStart(2,"0")}-31`;
+
+    const { db, collection, query, where, getDocs } = window.FB;
+    let students=[], records=[];
+    try {
+      const [sSnap,aSnap] = await Promise.all([
+        getDocs(query(collection(db,"students"),where("classId","==",classId))),
+        getDocs(query(collection(db,"attendance"),where("classId","==",classId),where("date",">=",from),where("date","<=",to)))
+      ]);
+      sSnap.forEach(d=>students.push({id:d.id,...d.data()}));
+      aSnap.forEach(d=>records.push(d.data()));
+    } catch(e) {}
+
+    const summary = {};
+    students.forEach(s=>{summary[s.id]={name:s.name,indexNo:s.indexNo,gender:s.gender,present:0,absent:0,late:0,medical:0};});
+    records.forEach(r=>{
+      if(!summary[r.studentId]) return;
+      const k = r.status?.toLowerCase();
+      if(summary[r.studentId][k]!==undefined) summary[r.studentId][k]++;
+    });
+
+    const rows = Object.values(summary).map(s=>{
+      const total = s.present+s.absent+s.late+s.medical;
+      const pct   = total?Math.round((s.present/total)*100):0;
+      return `<tr>
+        <td>${s.indexNo||"—"}</td>
+        <td><strong>${s.name}</strong></td>
+        <td><span class="badge ${s.gender==="Male"?"badge-teacher":"badge-medical"}">${s.gender}</span></td>
+        <td style="color:var(--success);font-weight:700;">${s.present}</td>
+        <td style="color:var(--danger);font-weight:700;">${s.absent}</td>
+        <td style="color:var(--late);font-weight:700;">${s.late}</td>
+        <td style="color:var(--cyan);font-weight:700;">${s.medical}</td>
+        <td><span style="font-weight:800;color:${pct>=85?"var(--success)":pct>=70?"var(--warning)":"var(--danger)"};">${pct}%</span></td>
+      </tr>`;
+    }).join("");
+
+    this.modal(`Monthly Summary — ${now.toLocaleString("default",{month:"long"})} ${year}`, `
+      <div class="table-wrapper" style="max-height:420px;overflow-y:auto;">
+        <table>
+          <thead><tr><th>#</th><th>Name</th><th>Gender</th><th>✓</th><th>✗</th><th>⏰</th><th>❤</th><th>%</th></tr></thead>
+          <tbody>${rows||`<tr><td colspan="8" style="text-align:center;padding:2rem;color:var(--text-muted);">No data</td></tr>`}</tbody>
+        </table>
+      </div>`,
+      `<button class="btn btn-outline" onclick="APP.closeModal()">Close</button>
+       <button class="btn btn-success" onclick="APP.printMonthlySummaryTable()"><i class="fas fa-print"></i> Print</button>`
+    );
+  },
+
+  printMonthlySummaryTable() {
+    const t = document.querySelector(".modal .table-wrapper table");
+    if (!t) return;
+    const w = window.open("","_blank");
+    w.document.write(`<html><head><title>Monthly Summary</title>
+      <style>body{font-family:sans-serif;padding:2rem;}table{width:100%;border-collapse:collapse;}th,td{border:1px solid #ccc;padding:.5rem;font-size:.82rem;}th{background:#1a3a8f;color:#fff;}</style></head>
+      <body><h2>BD/Hindu College Welimada — Monthly Summary</h2>${t.outerHTML}<script>window.print();<\/script></body></html>`);
+    w.document.close();
+  },
+
+  // ================================================================
+  // GLOBAL SEARCH
+  // ================================================================
+  showGlobalSearch() {
+    this.modal("🔍 Global Search", `
+      <div class="search-bar" style="max-width:100%;margin-bottom:1rem;">
+        <i class="fas fa-search"></i>
+        <input type="text" class="form-control" id="gs-input" placeholder="Search students, teachers, classes..."
+          oninput="APP.doGlobalSearch(this.value)" autofocus style="padding-left:2.5rem;"/>
+      </div>
+      <div id="gs-results"><p style="color:var(--text-muted);font-size:.85rem;text-align:center;">Start typing to search...</p></div>`, ``
+    );
+    setTimeout(()=>document.getElementById("gs-input")?.focus(),100);
+  },
+
+  async doGlobalSearch(val) {
+    const out = document.getElementById("gs-results");
+    if (!out) return;
+    if (val.length < 2) { out.innerHTML = `<p style="color:var(--text-muted);font-size:.85rem;text-align:center;">Type at least 2 characters</p>`; return; }
+    const q = val.toLowerCase();
+    out.innerHTML = `<div style="display:flex;justify-content:center;padding:1rem;"><div class="loader-ring" style="width:32px;height:32px;border-width:3px;"></div></div>`;
+
+    const { db, collection, getDocs } = window.FB;
+    let results = [];
+    try {
+      const sSnap = await getDocs(collection(db,"students"));
+      sSnap.forEach(d => { const s=d.data(); if((s.name||"").toLowerCase().includes(q)||(s.indexNo||"").toLowerCase().includes(q)) results.push({type:"student",id:d.id,...s}); });
+    } catch(e) {}
+    // Search local teachers
+    const teachers = window.AUTH.getTeachers();
+    teachers.forEach(t => { if((t.name||"").toLowerCase().includes(q)) results.push({type:"teacher",id:t.id,name:t.name}); });
+
+    if (!results.length) { out.innerHTML = `<p style="color:var(--text-muted);font-size:.85rem;text-align:center;">No results for "${val}"</p>`; return; }
+
+    out.innerHTML = results.slice(0,12).map(r => `
+      <div style="display:flex;align-items:center;gap:.75rem;padding:.7rem;border-radius:10px;background:var(--glass-bg);border:1px solid var(--glass-border);margin-bottom:.4rem;cursor:pointer;"
+        onclick="${r.type==="student"?`APP.closeModal();APP.showStudentProfile('${r.id}')`:``}">
+        <div style="width:36px;height:36px;border-radius:10px;background:linear-gradient(135deg,${r.type==="student"?"var(--blue-light),var(--cyan)":"var(--blue-main),var(--blue-accent)"});display:flex;align-items:center;justify-content:center;font-size:.9rem;color:#fff;font-weight:800;">
+          ${(r.name||"?")[0].toUpperCase()}
+        </div>
+        <div>
+          <div style="font-weight:700;font-size:.88rem;">${r.name||"—"}</div>
+          <div style="font-size:.72rem;color:var(--text-muted);">
+            ${r.type==="student"?`Student · ${r.classId||"—"} · #${r.indexNo||"—"}`:`Teacher`}
+          </div>
+        </div>
+        <span class="badge ${r.type==="student"?"badge-teacher":"badge-admin"}" style="margin-left:auto;">${r.type}</span>
+      </div>`).join("");
+  },
+
+  // ================================================================
+  // SETUP GUIDE (shown from Settings)
+  // ================================================================
+  showSetupGuide() {
+    this.modal("🔥 Firestore Setup Guide", `
+      <div style="font-size:.83rem;line-height:1.8;color:var(--text-muted);">
+        <div style="background:rgba(16,185,129,.1);border:1px solid rgba(16,185,129,.3);border-radius:10px;padding:.75rem 1rem;margin-bottom:1rem;color:#34d399;">
+          <i class="fas fa-check-circle"></i> <strong>Firebase Authentication is NOT required.</strong> Login is handled locally — no billing triggered.
+        </div>
+
+        <h4 style="color:var(--white);margin-bottom:.5rem;">Step 1 — Create Firebase Project</h4>
+        <p>Go to <a href="https://console.firebase.google.com" target="_blank" style="color:var(--sky);">console.firebase.google.com</a> → Add Project → Follow steps.</p>
+
+        <h4 style="color:var(--white);margin:1rem 0 .5rem;">Step 2 — Enable Firestore Only</h4>
+        <p>Firestore Database → Create database → Start in <strong>test mode</strong>. <strong>Skip Authentication entirely.</strong></p>
+
+        <h4 style="color:var(--white);margin:1rem 0 .5rem;">Step 3 — Copy Config</h4>
+        <p>Project Settings ⚙ → Your Apps → Web App (</> icon) → Register → Copy <code style="color:var(--sky);">firebaseConfig</code> → Paste into this file at the top.</p>
+
+        <h4 style="color:var(--white);margin:1rem 0 .5rem;">Step 4 — Firestore Security Rules</h4>
+        <pre style="background:rgba(0,0,0,.4);border-radius:10px;padding:1rem;font-size:.73rem;color:var(--sky);overflow-x:auto;line-height:1.6;">rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /{document=**} {
+      allow read, write: if true; // Update when ready for production
+    }
+  }
+}</pre>
+
+        <h4 style="color:var(--white);margin:1rem 0 .5rem;">Step 5 — Login Credentials</h4>
+        <p>Default principal login: <code style="color:var(--sky);">principal@whc.lk</code> / <code style="color:var(--sky);">principal@1221</code><br>
+        Change these anytime from <strong>Settings → Principal Credentials</strong>.<br>
+        Add teacher accounts from <strong>Teachers → Add Teacher</strong>.</p>
+
+        <h4 style="color:var(--white);margin:1rem 0 .5rem;">Deploy to GitHub Pages</h4>
+        <p>Push this file to a GitHub repo → Settings → Pages → Deploy from main branch. Done!</p>
+      </div>`, ``
+    );
+  },
+}; // end APP
+
+// ── Keyboard shortcut: Ctrl+K → Global Search ──────────────────────
+document.addEventListener("keydown", e => {
+  if ((e.ctrlKey||e.metaKey) && e.key==="k") {
+    e.preventDefault();
+    if (APP.currentUser) APP.showGlobalSearch();
+  }
+});
+
+// ── Enter key on login ────────────────────────────────────────────
+document.addEventListener("keydown", e => {
+  if (e.key==="Enter" && !document.getElementById("page-login")?.classList.contains("hidden")) APP.login();
+});
+</script>
+</body>
+</html>
