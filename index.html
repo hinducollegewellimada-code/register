@@ -4,14 +4,14 @@
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 <title>BD/Hindu College Welimada — Attendance System</title>
- 
+
 <!-- Google Fonts -->
 <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;500;600;700;800;900&family=Poppins:wght@300;400;500;600;700;800&display=swap" rel="stylesheet"/>
 <!-- Font Awesome -->
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css"/>
 <!-- Chart.js -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
- 
+
 <!-- ============================================================
      FIREBASE SDK  (Firestore only — no Auth billing)
      ============================================================ -->
@@ -25,34 +25,34 @@
   // ║  NOTE: Firebase Authentication is NOT required / NOT used       ║
   // ╚══════════════════════════════════════════════════════════════════╝
   const firebaseConfig = {
-  apiKey: "AIzaSyBh5PYhost31YBNWmr4G3sVCPxcaD2yNEY",
-  authDomain: "whc-full-data.firebaseapp.com",
-  projectId: "whc-full-data",
-  storageBucket: "whc-full-data.firebasestorage.app",
-  messagingSenderId: "600680727409",
-  appId: "1:600680727409:web:ffedf16d56098282bfecd0",
-  measurementId: "G-YSQCY0FHP0"
+    apiKey:            "AIzaSyBh5PYhost31YBNWmr4G3sVCPxcaD2yNEY",
+    authDomain:        "whc-full-data.firebaseapp.com",
+    projectId:         "whc-full-data",
+    storageBucket:     "whc-full-data.firebasestorage.app",
+    messagingSenderId: "600680727409",
+    appId:             "1:600680727409:web:ffedf16d56098282bfecd0",
+    measurementId:     "G-YSQCY0FHP0"
   };
- 
+
   import { initializeApp }          from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
   import { getFirestore, doc, getDoc, setDoc,
            updateDoc, deleteDoc, collection,
            getDocs, addDoc, query, where,
            orderBy, onSnapshot, serverTimestamp,
            Timestamp }               from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
- 
+
   // ── Init ──────────────────────────────────────────────────────────
   const app = initializeApp(firebaseConfig);
   const db  = getFirestore(app);
- 
+
   // ── Expose Firestore helpers to window ────────────────────────────
   window.FB = { db, doc, getDoc, setDoc, updateDoc, deleteDoc,
     collection, getDocs, addDoc, query, where, orderBy, onSnapshot,
     serverTimestamp, Timestamp };
- 
+
   window.dispatchEvent(new Event("firebaseReady"));
 </script>
- 
+
 <!-- ============================================================
      LOCAL AUTH SYSTEM  (no Firebase Auth — no billing)
      Login credentials stored in localStorage.
@@ -66,7 +66,7 @@
     name: "Principal",
     role: "principal"
   };
- 
+
   window.AUTH = {
     // Returns stored principal creds or defaults
     getPrincipal() {
@@ -115,13 +115,13 @@
     }
   };
 </script>
- 
+
 <style>
 /* ================================================================
    RESET & ROOT VARIABLES
    ================================================================ */
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
- 
+
 :root {
   --blue-dark:   #0a1628;
   --blue-mid:    #0d2147;
@@ -144,7 +144,7 @@
   --sidebar-w:   260px;
   --transition:  all .3s cubic-bezier(.4,0,.2,1);
 }
- 
+
 body {
   font-family: 'Nunito', sans-serif;
   background: var(--blue-dark);
@@ -152,7 +152,7 @@ body {
   min-height: 100vh;
   overflow-x: hidden;
 }
- 
+
 /* ── Background mesh ─────────────────────────────────────────────── */
 body::before {
   content: '';
@@ -162,12 +162,12 @@ body::before {
     radial-gradient(ellipse 60% 50% at 80% 80%, rgba(6,182,212,.25) 0%, transparent 60%),
     linear-gradient(160deg, #0a1628 0%, #0d2147 50%, #0f172a 100%);
 }
- 
+
 /* ── Scrollbar ───────────────────────────────────────────────────── */
 ::-webkit-scrollbar { width: 6px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: var(--blue-accent); border-radius: 3px; }
- 
+
 /* ================================================================
    UTILITY
    ================================================================ */
@@ -185,7 +185,7 @@ body::before {
 .text-xs  { font-size: .75rem; }
 .font-bold{ font-weight: 700; }
 .text-center { text-align: center; }
- 
+
 /* ── Glass card ──────────────────────────────────────────────────── */
 .glass {
   background: var(--glass-bg);
@@ -194,7 +194,7 @@ body::before {
   -webkit-backdrop-filter: blur(16px);
   border-radius: var(--card-radius);
 }
- 
+
 /* ── Buttons ─────────────────────────────────────────────────────── */
 .btn {
   display: inline-flex; align-items: center; gap: .45rem;
@@ -220,7 +220,7 @@ body::before {
 .btn-outline:hover { background: var(--glass-bg); }
 .btn-sm { padding: .4rem .9rem; font-size: .8rem; border-radius: 8px; }
 .btn-icon { padding: .5rem; border-radius: 8px; aspect-ratio: 1; justify-content: center; }
- 
+
 /* ── Inputs ──────────────────────────────────────────────────────── */
 .input-group { display: flex; flex-direction: column; gap: .35rem; margin-bottom: 1rem; }
 .input-group label { font-size: .82rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: .05em; }
@@ -234,7 +234,7 @@ body::before {
 .form-control:focus { outline: none; border-color: var(--blue-accent); background: rgba(255,255,255,0.1); box-shadow: 0 0 0 3px rgba(59,130,246,.25); }
 .form-control option { background: var(--blue-mid); }
 select.form-control { cursor: pointer; }
- 
+
 /* ── Badge ───────────────────────────────────────────────────────── */
 .badge {
   display: inline-flex; align-items: center; gap:.3rem;
@@ -246,7 +246,7 @@ select.form-control { cursor: pointer; }
 .badge-medical  { background: rgba(6,182,212,.2);  color: var(--cyan);    border: 1px solid rgba(6,182,212,.3); }
 .badge-admin    { background: rgba(139,92,246,.2); color: #a78bfa;        border: 1px solid rgba(139,92,246,.3); }
 .badge-teacher  { background: rgba(37,99,235,.2);  color: var(--sky);     border: 1px solid rgba(37,99,235,.3); }
- 
+
 /* ── Toast ───────────────────────────────────────────────────────── */
 #toast-container {
   position: fixed; top: 1.2rem; right: 1.2rem; z-index: 9999;
@@ -265,7 +265,7 @@ select.form-control { cursor: pointer; }
 .toast.warning { border-left: 4px solid var(--warning); }
 @keyframes slideIn  { from { opacity:0; transform: translateX(60px); } to { opacity:1; transform: translateX(0); } }
 @keyframes slideOut { from { opacity:1; transform: translateX(0); } to { opacity:0; transform: translateX(60px); } }
- 
+
 /* ── Loading overlay ─────────────────────────────────────────────── */
 #loader {
   position: fixed; inset: 0; z-index: 9998;
@@ -279,7 +279,7 @@ select.form-control { cursor: pointer; }
 }
 @keyframes spin { to { transform: rotate(360deg); } }
 #loader p { color: var(--text-muted); font-size: .95rem; }
- 
+
 /* ================================================================
    LOGIN PAGE
    ================================================================ */
@@ -294,7 +294,7 @@ select.form-control { cursor: pointer; }
   animation: fadeUp .6s ease;
 }
 @keyframes fadeUp { from { opacity:0; transform: translateY(30px); } to { opacity:1; transform: translateY(0); } }
- 
+
 .login-logo {
   text-align: center; margin-bottom: 2rem;
 }
@@ -306,7 +306,7 @@ select.form-control { cursor: pointer; }
   animation: pulse 3s ease-in-out infinite;
 }
 @keyframes pulse { 0%,100%{ box-shadow:0 0 0 0 rgba(37,99,235,.5); } 50%{ box-shadow:0 0 0 16px rgba(37,99,235,0); } }
- 
+
 .login-logo h1 {
   font-family: 'Poppins', sans-serif;
   font-size: 1.15rem; font-weight: 800;
@@ -316,14 +316,14 @@ select.form-control { cursor: pointer; }
   margin-top: .75rem; line-height: 1.3;
 }
 .login-logo p { color: var(--text-muted); font-size: .8rem; margin-top: .25rem; }
- 
+
 .login-btn { width: 100%; padding: .8rem; font-size: 1rem; margin-top: .5rem; border-radius: 12px; }
- 
+
 /* ================================================================
    APP SHELL (after login)
    ================================================================ */
 #app-shell { display: flex; min-height: 100vh; }
- 
+
 /* ── Sidebar ─────────────────────────────────────────────────────── */
 #sidebar {
   width: var(--sidebar-w); min-height: 100vh;
@@ -335,7 +335,7 @@ select.form-control { cursor: pointer; }
   transition: var(--transition);
 }
 #sidebar.collapsed { width: 70px; }
- 
+
 .sidebar-header {
   padding: 1.25rem 1rem;
   display: flex; align-items: center; gap: .75rem;
@@ -352,14 +352,14 @@ select.form-control { cursor: pointer; }
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 .sidebar-title p { font-size: .68rem; color: var(--text-muted); margin-top: 2px; }
- 
+
 #collapse-btn {
   background: none; border: none; color: var(--text-muted);
   cursor: pointer; padding: .3rem; border-radius: 6px;
   transition: var(--transition);
 }
 #collapse-btn:hover { color: var(--white); background: var(--glass-bg); }
- 
+
 .sidebar-user {
   padding: 1rem;
   border-bottom: 1px solid var(--glass-border);
@@ -375,7 +375,7 @@ select.form-control { cursor: pointer; }
 .user-info { flex: 1; overflow: hidden; }
 .user-info h4 { font-size: .85rem; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .user-info p  { font-size: .72rem; color: var(--text-muted); }
- 
+
 .sidebar-nav { flex: 1; padding: .75rem .6rem; overflow-y: auto; }
 .nav-section-title {
   font-size: .65rem; font-weight: 800; text-transform: uppercase;
@@ -398,12 +398,12 @@ select.form-control { cursor: pointer; }
 #sidebar.collapsed .nav-section-title,
 #sidebar.collapsed .user-info,
 #sidebar.collapsed .sidebar-title { opacity: 0; width: 0; overflow: hidden; }
- 
+
 .sidebar-footer {
   padding: .75rem .6rem;
   border-top: 1px solid var(--glass-border);
 }
- 
+
 /* ── Main content ─────────────────────────────────────────────────── */
 #main-content {
   flex: 1; margin-left: var(--sidebar-w);
@@ -412,7 +412,7 @@ select.form-control { cursor: pointer; }
   display: flex; flex-direction: column;
 }
 #sidebar.collapsed ~ #main-content { margin-left: 70px; }
- 
+
 /* ── Top bar ─────────────────────────────────────────────────────── */
 #topbar {
   position: sticky; top: 0; z-index: 90;
@@ -430,25 +430,25 @@ select.form-control { cursor: pointer; }
   border-radius: 8px; transition: var(--transition); font-size: .85rem;
 }
 #theme-toggle:hover { color: var(--white); border-color: var(--blue-accent); }
- 
+
 .topbar-date {
   font-size: .78rem; color: var(--text-muted); white-space: nowrap;
 }
- 
+
 /* ── Page content area ───────────────────────────────────────────── */
 .page-content {
   flex: 1; padding: 1.5rem;
   animation: fadeIn .4s ease;
 }
 @keyframes fadeIn { from { opacity:0; } to { opacity:1; } }
- 
+
 /* ── Section header ──────────────────────────────────────────────── */
 .section-header {
   display: flex; align-items: center; justify-content: space-between;
   flex-wrap: wrap; gap: .75rem; margin-bottom: 1.25rem;
 }
 .section-header h2 { font-size: 1.25rem; font-weight: 800; }
- 
+
 /* ── Stats grid ──────────────────────────────────────────────────── */
 .stats-grid {
   display: grid;
@@ -480,7 +480,7 @@ select.form-control { cursor: pointer; }
 .stat-red .stat-icon { background: rgba(239,68,68,.2); color: var(--danger); }
 .stat-cyan .stat-icon { background: rgba(6,182,212,.2); color: var(--cyan); }
 .stat-orange .stat-icon { background: rgba(249,115,22,.2); color: var(--late); }
- 
+
 /* ── Table ───────────────────────────────────────────────────────── */
 .table-wrapper { overflow-x: auto; border-radius: var(--card-radius); }
 table { width: 100%; border-collapse: collapse; font-size: .87rem; }
@@ -493,10 +493,10 @@ tbody td { padding: .85rem 1rem; border-bottom: 1px solid var(--glass-border); v
 tbody tr:last-child td { border-bottom: none; }
 tbody tr:hover { background: rgba(255,255,255,.03); }
 .td-actions { display: flex; gap: .4rem; }
- 
+
 /* ── Card grid ───────────────────────────────────────────────────── */
 .card { padding: 1.25rem; border-radius: var(--card-radius); }
- 
+
 /* ── Attendance mark grid ────────────────────────────────────────── */
 .att-grid { display: flex; flex-direction: column; gap: .6rem; }
 .att-row {
@@ -521,7 +521,7 @@ tbody tr:hover { background: rgba(255,255,255,.03); }
 .att-status-btn.absent.active  { background: rgba(239,68,68,.25);  color: var(--danger);  border-color: var(--danger); }
 .att-status-btn.late.active    { background: rgba(249,115,22,.25); color: var(--late);    border-color: var(--late); }
 .att-status-btn.medical.active { background: rgba(6,182,212,.25);  color: var(--cyan);    border-color: var(--cyan); }
- 
+
 /* ── Search bar ──────────────────────────────────────────────────── */
 .search-bar {
   position: relative; flex: 1; max-width: 320px;
@@ -531,7 +531,7 @@ tbody tr:hover { background: rgba(255,255,255,.03); }
   color: var(--text-muted); font-size: .85rem; pointer-events: none;
 }
 .search-bar input { padding-left: 2.5rem; }
- 
+
 /* ── Modal ───────────────────────────────────────────────────────── */
 .modal-overlay {
   position: fixed; inset: 0; z-index: 200;
@@ -553,17 +553,17 @@ tbody tr:hover { background: rgba(255,255,255,.03); }
 .modal-header h3 { font-size: 1.1rem; font-weight: 800; }
 .modal-close { background: none; border: none; color: var(--text-muted); cursor: pointer; font-size: 1.2rem; padding: .25rem; }
 .modal-close:hover { color: var(--danger); }
- 
+
 /* ── Progress bar ────────────────────────────────────────────────── */
 .progress-bar-wrap { background: rgba(255,255,255,.08); border-radius: 999px; height: 8px; overflow: hidden; }
 .progress-bar { height: 100%; border-radius: 999px; transition: width .8s ease; }
 .progress-bar.high   { background: linear-gradient(90deg, var(--success), #34d399); }
 .progress-bar.medium { background: linear-gradient(90deg, var(--warning), #fbbf24); }
 .progress-bar.low    { background: linear-gradient(90deg, var(--danger),  #f87171); }
- 
+
 /* ── Chart container ─────────────────────────────────────────────── */
 .chart-wrap { position: relative; height: 260px; }
- 
+
 /* ── Firebase config info box ───────────────────────────────────── */
 #firebase-config-box {
   position: fixed; inset:0; z-index: 300;
@@ -579,7 +579,7 @@ tbody tr:hover { background: rgba(255,255,255,.03); }
   color: var(--sky); overflow-x: auto; line-height: 1.6;
   font-family: monospace; margin: 1rem 0;
 }
- 
+
 /* ── Light mode ──────────────────────────────────────────────────── */
 body.light {
   --glass-bg:    rgba(255,255,255,0.65);
@@ -595,7 +595,7 @@ body.light #sidebar { background: rgba(248,250,252,.92); }
 body.light #topbar  { background: rgba(248,250,252,.85); }
 body.light .form-control { background: rgba(0,0,0,.04); color: var(--text-dark); border-color: rgba(0,0,0,.12); }
 body.light .att-row { background: rgba(255,255,255,.8); }
- 
+
 /* ================================================================
    RESPONSIVE
    ================================================================ */
@@ -609,15 +609,15 @@ body.light .att-row { background: rgba(255,255,255,.8); }
   .att-row { grid-template-columns: 1.5rem 1fr; }
   .att-status-btns { grid-column: 1/-1; }
 }
- 
+
 #mobile-menu-btn { display: none; background: none; border: none; color: var(--text-main); font-size: 1.2rem; cursor: pointer; }
 #mobile-overlay { display: none; position: fixed; inset:0; z-index:99; background: rgba(0,0,0,.5); }
 #mobile-overlay.show { display: block; }
- 
+
 /* ── Page panels ─────────────────────────────────────────────────── */
 .panel { display: none; }
 .panel.active { display: block; }
- 
+
 /* ── Tabs ────────────────────────────────────────────────────────── */
 .tabs { display: flex; gap: .4rem; flex-wrap: wrap; margin-bottom: 1.25rem; }
 .tab-btn {
@@ -627,7 +627,7 @@ body.light .att-row { background: rgba(255,255,255,.8); }
   font-family: 'Nunito', sans-serif;
 }
 .tab-btn.active, .tab-btn:hover { background: var(--glass-bg); color: var(--white); border-color: var(--blue-accent); }
- 
+
 /* ── Student card ────────────────────────────────────────────────── */
 .students-grid {
   display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
@@ -649,7 +649,7 @@ body.light .att-row { background: rgba(255,255,255,.8); }
 .student-avatar img { width: 100%; height: 100%; object-fit: cover; border-radius: 14px; }
 .student-info h4 { font-size: .92rem; font-weight: 800; }
 .student-info p { font-size: .75rem; color: var(--text-muted); }
- 
+
 /* ── Permission checkbox grid ────────────────────────────────────── */
 .perm-grid {
   display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
@@ -662,7 +662,7 @@ body.light .att-row { background: rgba(255,255,255,.8); }
   font-size: .82rem; cursor: pointer;
 }
 .perm-item input { cursor: pointer; accent-color: var(--blue-accent); }
- 
+
 /* ── Empty state ─────────────────────────────────────────────────── */
 .empty-state {
   text-align: center; padding: 3rem 1rem; color: var(--text-muted);
@@ -672,16 +672,16 @@ body.light .att-row { background: rgba(255,255,255,.8); }
 </style>
 </head>
 <body>
- 
+
 <!-- ── Toast container ──────────────────────────────────────────────── -->
 <div id="toast-container"></div>
- 
+
 <!-- ── Global Loader ─────────────────────────────────────────────────── -->
 <div id="loader">
   <div class="loader-ring"></div>
   <p>Loading BD/Hindu College Welimada...</p>
 </div>
- 
+
 <!-- ================================================================
      FIRESTORE CONFIG WARNING (shows if API key not set)
      ================================================================ -->
@@ -717,7 +717,7 @@ const firebaseConfig = {
     </button>
   </div>
 </div>
- 
+
 <!-- ================================================================
      LOGIN PAGE
      ================================================================ -->
@@ -728,7 +728,7 @@ const firebaseConfig = {
       <h1>BD/Hindu College<br>Welimada</h1>
       <p>Attendance Management System</p>
     </div>
- 
+
     <div class="input-group">
       <label><i class="fas fa-user"></i> Username</label>
       <input type="text" id="login-email" class="form-control" placeholder="principal@whc.lk" autocomplete="username"/>
@@ -746,21 +746,21 @@ const firebaseConfig = {
     <button class="btn btn-primary login-btn" onclick="APP.login()">
       <i class="fas fa-sign-in-alt"></i> Sign In
     </button>
- 
+
     <p class="text-center mt-4 text-sm" style="color:var(--text-muted);">
       <i class="fas fa-shield-alt"></i> Secure Login · BD/Hindu College Welimada
     </p>
   </div>
 </div>
- 
+
 <!-- ================================================================
      APP SHELL
      ================================================================ -->
 <div id="app-shell" class="hidden">
- 
+
   <!-- Mobile overlay -->
   <div id="mobile-overlay" onclick="APP.closeSidebar()"></div>
- 
+
   <!-- ── SIDEBAR ─────────────────────────────────────────────── -->
   <nav id="sidebar">
     <div class="sidebar-header">
@@ -774,7 +774,7 @@ const firebaseConfig = {
         <i class="fas fa-bars"></i>
       </button>
     </div>
- 
+
     <div class="sidebar-user">
       <div class="user-avatar" id="sb-avatar">A</div>
       <div class="user-info">
@@ -782,9 +782,9 @@ const firebaseConfig = {
         <p id="sb-role">Principal</p>
       </div>
     </div>
- 
+
     <div class="sidebar-nav" id="sidebar-nav"></div>
- 
+
     <div class="sidebar-footer">
       <a href="marks.html" class="nav-item" style="text-decoration:none;color:inherit;border:1px solid rgba(6,182,212,.3);background:rgba(6,182,212,.08);border-radius:10px;margin-bottom:4px;">
         <i class="fas fa-chart-bar" style="color:#67e8f9;"></i>
@@ -796,7 +796,7 @@ const firebaseConfig = {
       </div>
     </div>
   </nav>
- 
+
   <!-- ── MAIN CONTENT ─────────────────────────────────────────── -->
   <div id="main-content">
     <div id="topbar">
@@ -821,16 +821,16 @@ const firebaseConfig = {
         </button>
       </div>
     </div>
- 
+
     <div class="page-content" id="page-content">
       <!-- panels injected here -->
     </div>
   </div>
 </div>
- 
+
 <!-- ── Modal container ─────────────────────────────────────────────── -->
 <div id="modal-container"></div>
- 
+
 <!-- ================================================================
      APPLICATION JAVASCRIPT
      ================================================================ -->
@@ -844,7 +844,7 @@ setTimeout(() => {
     document.getElementById("firebase-config-box").classList.remove("hidden");
   }
 }, 2500);
- 
+
 /* ================================================================
    MAIN APP OBJECT
    ================================================================ */
@@ -855,13 +855,13 @@ const APP = {
   sidebarCollapsed: false,
   currentPanel: null,
   charts: {},
- 
+
   // ── Init ───────────────────────────────────────────────────────
   async init() {
     this.updateClock();
     setInterval(() => this.updateClock(), 60000);
     this.setupInactivity();
- 
+
     document.getElementById("loader").classList.add("hidden");
     // Check existing session
     const session = window.AUTH.getSession();
@@ -874,7 +874,7 @@ const APP = {
       this.showLogin();
     }
   },
- 
+
   // ── Auth ───────────────────────────────────────────────────────
   togglePwdVisibility() {
     const inp = document.getElementById("login-password");
@@ -887,7 +887,7 @@ const APP = {
       eye.innerHTML = '<i class="fas fa-eye"></i>';
     }
   },
- 
+
   login() {
     const username = document.getElementById("login-email").value.trim();
     const pass     = document.getElementById("login-password").value;
@@ -911,21 +911,21 @@ const APP = {
       document.getElementById("login-password").value = "";
     }
   },
- 
+
   logout() {
     window.AUTH.clearSession();
     this.currentUser = null; this.userProfile = null;
     this.showLogin();
     this.toast("Signed out", "info");
   },
- 
+
   // ── Pages ──────────────────────────────────────────────────────
   showLogin() {
     document.getElementById("page-login").classList.remove("hidden");
     document.getElementById("app-shell").classList.add("hidden");
     document.getElementById("firebase-config-box").classList.add("hidden");
   },
- 
+
   showApp() {
     document.getElementById("page-login").classList.add("hidden");
     document.getElementById("app-shell").classList.remove("hidden");
@@ -941,7 +941,7 @@ const APP = {
       if (dot && n.length > 0) dot.style.display = "block";
     });
   },
- 
+
   // ── Sidebar ────────────────────────────────────────────────────
   buildSidebar() {
     const role = this.userProfile?.role;
@@ -964,7 +964,7 @@ const APP = {
       });
     });
   },
- 
+
   adminNavSections() {
     return [
       { title: "Overview", items: [
@@ -986,7 +986,7 @@ const APP = {
       ]},
     ];
   },
- 
+
   teacherNavSections(perms) {
     const items = [
       { panel:"mark-attendance", icon:"fas fa-check-square", label:"Mark Attendance" },
@@ -996,7 +996,7 @@ const APP = {
     if (perms.viewReports)   items.push({ panel:"att-reports", icon:"fas fa-file-alt", label:"Reports" });
     return [{ title: "Menu", items }];
   },
- 
+
   navigate(panel) {
     this.currentPanel = panel;
     document.querySelectorAll(".nav-item").forEach(n => {
@@ -1027,7 +1027,7 @@ const APP = {
     // close mobile
     if (window.innerWidth <= 768) this.closeSidebar();
   },
- 
+
   toggleSidebar() {
     const s = document.getElementById("sidebar");
     this.sidebarCollapsed = !this.sidebarCollapsed;
@@ -1041,7 +1041,7 @@ const APP = {
     document.getElementById("sidebar").classList.remove("mobile-open");
     document.getElementById("mobile-overlay").classList.remove("show");
   },
- 
+
   // ── Theme ──────────────────────────────────────────────────────
   toggleTheme() {
     this.darkMode = !this.darkMode;
@@ -1049,7 +1049,7 @@ const APP = {
     document.getElementById("theme-toggle").innerHTML =
       this.darkMode ? '<i class="fas fa-moon"></i>' : '<i class="fas fa-sun"></i>';
   },
- 
+
   // ── Clock ──────────────────────────────────────────────────────
   updateClock() {
     const now = new Date();
@@ -1057,7 +1057,7 @@ const APP = {
       now.toLocaleDateString("en-GB", { weekday:"short", day:"2-digit", month:"short", year:"numeric" })
       + " · " + now.toLocaleTimeString("en-GB", { hour:"2-digit", minute:"2-digit" });
   },
- 
+
   // ── Inactivity logout ──────────────────────────────────────────
   setupInactivity() {
     let t;
@@ -1068,7 +1068,7 @@ const APP = {
     ["mousemove","keydown","click","scroll","touchstart"].forEach(e => document.addEventListener(e, reset));
     reset();
   },
- 
+
   // ── Toast ──────────────────────────────────────────────────────
   toast(msg, type = "info", duration = 3500) {
     const icons = { success:"fas fa-check-circle", error:"fas fa-exclamation-circle", info:"fas fa-info-circle", warning:"fas fa-exclamation-triangle" };
@@ -1078,7 +1078,7 @@ const APP = {
     document.getElementById("toast-container").appendChild(t);
     setTimeout(() => { t.style.animation = "slideOut .35s ease forwards"; setTimeout(() => t.remove(), 400); }, duration);
   },
- 
+
   // ── Modal ──────────────────────────────────────────────────────
   modal(title, bodyHTML, footerHTML = "") {
     const overlay = document.createElement("div");
@@ -1096,131 +1096,215 @@ const APP = {
     document.getElementById("modal-container").appendChild(overlay);
     return overlay;
   },
- 
+
   closeModal() {
     document.querySelector(".modal-overlay")?.remove();
   },
- 
+
   // ================================================================
   // PANEL RENDERERS
   // ================================================================
- 
+
   // ── DASHBOARD ──────────────────────────────────────────────────
   async renderDashboard() {
     const pc = document.getElementById("page-content");
     const today = new Date().toISOString().split("T")[0];
- 
-    // Fetch stats
     const { db, collection, getDocs, query, where } = window.FB;
-    let totalStudents = 0, totalBoys = 0, totalGirls = 0;
-    let presentToday = 0, absentToday = 0, lateToday = 0;
-    let absentList = [];
- 
+
+    // Loading skeleton
+    pc.innerHTML = `<div style="display:flex;align-items:center;justify-content:center;padding:4rem;gap:1rem;color:var(--text-muted);">
+      <div class="loader-ring" style="width:32px;height:32px;border-width:3px;"></div> Loading dashboard…</div>`;
+
+    let totalStudents=0, totalBoys=0, totalGirls=0;
+    let presentToday=0, absentToday=0, lateToday=0, medicalToday=0;
+    let absentList=[], students=[], classes=[], attToday=[];
+
     try {
-      const studSnap = await getDocs(collection(db, "students"));
-      totalStudents = studSnap.size;
-      studSnap.forEach(d => { const s = d.data(); if(s.gender==="Male") totalBoys++; else totalGirls++; });
- 
-      const attSnap = await getDocs(query(collection(db, "attendance"), where("date","==",today)));
+      const [studSnap, classSnap, attSnap] = await Promise.all([
+        getDocs(collection(db,"students")),
+        getDocs(collection(db,"classes")),
+        getDocs(query(collection(db,"attendance"), where("date","==",today)))
+      ]);
+      studSnap.forEach(d => { const s={id:d.id,...d.data()}; students.push(s);
+        totalStudents++; if(s.gender==="Male") totalBoys++; else totalGirls++; });
+      classSnap.forEach(d => classes.push({id:d.id,...d.data()}));
       attSnap.forEach(d => {
-        const r = d.data();
-        if (r.status === "Present") presentToday++;
-        else if (r.status === "Absent") { absentToday++; absentList.push(r.studentName || "Unknown"); }
-        else if (r.status === "Late")   lateToday++;
+        const r=d.data(); attToday.push(r);
+        if(r.status==="Present") presentToday++;
+        else if(r.status==="Absent"){ absentToday++; absentList.push({name:r.studentName||"?",gender:r.gender||""}); }
+        else if(r.status==="Late")   lateToday++;
+        else if(r.status==="Medical") medicalToday++;
       });
     } catch(e) {}
- 
-    const avgPct = totalStudents > 0 ? Math.round((presentToday / totalStudents) * 100) : 0;
- 
+
+    const avgPct = totalStudents>0 ? Math.round((presentToday+lateToday)/totalStudents*100) : 0;
+
+    // ── Per-class attendance stats ──────────────────────────────
+    const classStats = {};
+    classes.forEach(c => {
+      const cStudents = students.filter(s=>s.classId===c.id);
+      const cAtt = attToday.filter(r=>r.classId===c.id);
+      const boys  = cStudents.filter(s=>s.gender==="Male");
+      const girls = cStudents.filter(s=>s.gender!=="Male");
+      const bPres = cAtt.filter(r=>r.gender==="Male"&&(r.status==="Present"||r.status==="Late")).length;
+      const gPres = cAtt.filter(r=>r.gender!=="Male"&&(r.status==="Present"||r.status==="Late")).length;
+      const present= cAtt.filter(r=>r.status==="Present"||r.status==="Late").length;
+      classStats[c.id] = {
+        name: c.name, total: cStudents.length,
+        boys: boys.length, girls: girls.length,
+        present, bPres, gPres,
+        pct: cStudents.length>0?Math.round(present/cStudents.length*100):0,
+        bPct: boys.length>0?Math.round(bPres/boys.length*100):0,
+        gPct: girls.length>0?Math.round(gPres/girls.length*100):0,
+        marked: cAtt.length > 0
+      };
+    });
+    const classArr = Object.values(classStats).sort((a,b)=>a.name.localeCompare(b.name));
+
+    const bar = (pct,color,h=5) => `<div style="background:rgba(255,255,255,.08);border-radius:999px;height:${h}px;margin-top:3px;overflow:hidden;"><div style="height:100%;width:${pct}%;background:${color};border-radius:999px;"></div></div>`;
+    const pctColor = p => p>=75?"#10b981":p>=50?"#3b82f6":p>=35?"#f59e0b":"#ef4444";
+
     pc.innerHTML = `
-      <div class="stats-grid">
-        <div class="stat-card glass stat-blue">
-          <div class="stat-icon"><i class="fas fa-user-graduate"></i></div>
-          <div class="stat-value" id="st-total">${totalStudents}</div>
-          <div class="stat-label">Total Students</div>
-        </div>
-        <div class="stat-card glass stat-green">
-          <div class="stat-icon"><i class="fas fa-check-circle"></i></div>
-          <div class="stat-value">${presentToday}</div>
-          <div class="stat-label">Present Today</div>
-        </div>
-        <div class="stat-card glass stat-red">
-          <div class="stat-icon"><i class="fas fa-times-circle"></i></div>
-          <div class="stat-value">${absentToday}</div>
-          <div class="stat-label">Absent Today</div>
-        </div>
-        <div class="stat-card glass stat-cyan">
-          <div class="stat-icon"><i class="fas fa-percentage"></i></div>
-          <div class="stat-value">${avgPct}%</div>
-          <div class="stat-label">Today's Rate</div>
-        </div>
-        <div class="stat-card glass stat-blue">
-          <div class="stat-icon"><i class="fas fa-mars"></i></div>
-          <div class="stat-value">${totalBoys}</div>
+      <!-- TOP STATS -->
+      <div class="stats-grid" style="margin-bottom:1.25rem;">
+        <div class="stat-card glass stat-blue"><div class="stat-icon"><i class="fas fa-user-graduate"></i></div><div class="stat-value">${totalStudents}</div><div class="stat-label">Total Students</div></div>
+        <div class="stat-card glass stat-green"><div class="stat-icon"><i class="fas fa-check-circle"></i></div><div class="stat-value">${presentToday}</div><div class="stat-label">Present Today</div></div>
+        <div class="stat-card glass stat-red"><div class="stat-icon"><i class="fas fa-times-circle"></i></div><div class="stat-value">${absentToday}</div><div class="stat-label">Absent Today</div></div>
+        <div class="stat-card glass stat-orange"><div class="stat-icon"><i class="fas fa-clock"></i></div><div class="stat-value">${lateToday}</div><div class="stat-label">Late Today</div></div>
+        <div class="stat-card glass" style="border:1px solid rgba(56,189,248,.25);background:rgba(56,189,248,.08);">
+          <div class="stat-icon" style="color:#38bdf8;"><i class="fas fa-mars"></i></div>
+          <div class="stat-value" style="color:#38bdf8;">${totalBoys}</div>
           <div class="stat-label">Total Boys</div>
         </div>
-        <div class="stat-card glass stat-orange">
-          <div class="stat-icon"><i class="fas fa-venus"></i></div>
-          <div class="stat-value">${totalGirls}</div>
+        <div class="stat-card glass" style="border:1px solid rgba(244,114,182,.25);background:rgba(244,114,182,.08);">
+          <div class="stat-icon" style="color:#f472b6;"><i class="fas fa-venus"></i></div>
+          <div class="stat-value" style="color:#f472b6;">${totalGirls}</div>
           <div class="stat-label">Total Girls</div>
         </div>
       </div>
- 
-      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:1rem;margin-bottom:1.5rem;">
+
+      <!-- CHARTS ROW -->
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:1rem;margin-bottom:1.25rem;">
         <div class="glass card">
-          <h3 style="font-size:.95rem;font-weight:800;margin-bottom:1rem;"><i class="fas fa-chart-pie" style="color:var(--blue-accent);margin-right:.5rem;"></i>Today's Overview</h3>
+          <h3 style="font-size:.9rem;font-weight:800;margin-bottom:.75rem;"><i class="fas fa-chart-pie" style="color:var(--blue-accent);margin-right:.4rem;"></i>Today's Overview</h3>
           <div class="chart-wrap"><canvas id="chart-today-pie"></canvas></div>
         </div>
         <div class="glass card">
-          <h3 style="font-size:.95rem;font-weight:800;margin-bottom:1rem;"><i class="fas fa-chart-bar" style="color:var(--cyan);margin-right:.5rem;"></i>Weekly Attendance</h3>
-          <div class="chart-wrap"><canvas id="chart-weekly-bar"></canvas></div>
+          <h3 style="font-size:.9rem;font-weight:800;margin-bottom:.75rem;"><i class="fas fa-venus-mars" style="color:#f472b6;margin-right:.4rem;"></i>Boys vs Girls — Today</h3>
+          <div class="chart-wrap"><canvas id="chart-gender-bar"></canvas></div>
         </div>
       </div>
- 
+
+      <!-- PER-CLASS ATTENDANCE TABLE (principal only) -->
+      ${this.userProfile?.role==="principal" ? `
+      <div class="glass card" style="margin-bottom:1.25rem;">
+        <div class="section-header" style="margin-bottom:.75rem;">
+          <h3 style="font-size:.95rem;font-weight:800;"><i class="fas fa-school" style="color:var(--cyan);margin-right:.5rem;"></i>Class-wise Attendance — ${today}</h3>
+          <span class="badge badge-teacher">${classArr.length} classes</span>
+        </div>
+        ${classArr.length===0
+          ? `<div class="empty-state"><i class="fas fa-school"></i><p>No classes created yet</p></div>`
+          : `<div style="overflow-x:auto;">
+          <table style="width:100%;border-collapse:collapse;font-size:.83rem;">
+            <thead><tr style="background:rgba(255,255,255,.05);">
+              <th style="text-align:left;padding:.6rem .9rem;font-weight:800;color:var(--text-muted);font-size:.75rem;text-transform:uppercase;letter-spacing:.05em;border-bottom:1px solid var(--glass-border);">Class</th>
+              <th style="padding:.6rem .9rem;font-weight:800;color:var(--text-muted);font-size:.75rem;text-transform:uppercase;letter-spacing:.05em;border-bottom:1px solid var(--glass-border);text-align:center;">Students</th>
+              <th style="padding:.6rem .9rem;font-weight:800;color:#38bdf8;font-size:.75rem;text-transform:uppercase;letter-spacing:.05em;border-bottom:1px solid var(--glass-border);text-align:center;">👦 Boys</th>
+              <th style="padding:.6rem .9rem;font-weight:800;color:#f472b6;font-size:.75rem;text-transform:uppercase;letter-spacing:.05em;border-bottom:1px solid var(--glass-border);text-align:center;">👧 Girls</th>
+              <th style="padding:.6rem .9rem;font-weight:800;color:var(--success);font-size:.75rem;text-transform:uppercase;letter-spacing:.05em;border-bottom:1px solid var(--glass-border);text-align:center;">Overall %</th>
+              <th style="padding:.6rem .9rem;font-weight:800;color:var(--text-muted);font-size:.75rem;text-transform:uppercase;letter-spacing:.05em;border-bottom:1px solid var(--glass-border);text-align:center;">Status</th>
+            </tr></thead>
+            <tbody>
+              ${classArr.map(c => `<tr style="border-bottom:1px solid rgba(255,255,255,.04);">
+                <td style="padding:.65rem .9rem;font-weight:700;">${c.name}</td>
+                <td style="padding:.65rem .9rem;text-align:center;color:var(--text-muted);">${c.total}</td>
+                <td style="padding:.65rem .9rem;text-align:center;">
+                  <span style="font-weight:800;color:#38bdf8;">${c.bPres}/${c.boys}</span>
+                  <div style="font-size:.7rem;color:#38bdf8;font-weight:700;">${c.bPct}%</div>
+                  ${bar(c.bPct,'#38bdf8',4)}
+                </td>
+                <td style="padding:.65rem .9rem;text-align:center;">
+                  <span style="font-weight:800;color:#f472b6;">${c.gPres}/${c.girls}</span>
+                  <div style="font-size:.7rem;color:#f472b6;font-weight:700;">${c.gPct}%</div>
+                  ${bar(c.gPct,'#f472b6',4)}
+                </td>
+                <td style="padding:.65rem .9rem;text-align:center;">
+                  <span style="font-size:1rem;font-weight:900;color:${pctColor(c.pct)};">${c.pct}%</span>
+                  ${bar(c.pct,pctColor(c.pct),5)}
+                </td>
+                <td style="padding:.65rem .9rem;text-align:center;">
+                  ${c.marked
+                    ? `<span class="badge badge-present"><i class="fas fa-check"></i> Marked</span>`
+                    : `<span class="badge badge-absent"><i class="fas fa-clock"></i> Not Marked</span>`}
+                </td>
+              </tr>`).join("")}
+            </tbody>
+          </table></div>`}
+      </div>` : ""}
+
+      <!-- ABSENT LIST -->
       <div class="glass card">
-        <div class="section-header">
+        <div class="section-header" style="margin-bottom:.75rem;">
           <h3 style="font-size:.95rem;font-weight:800;"><i class="fas fa-user-times" style="color:var(--danger);margin-right:.5rem;"></i>Absent Today (${absentList.length})</h3>
           <button class="btn btn-sm btn-outline" onclick="APP.navigate('att-reports')"><i class="fas fa-file-alt"></i> Full Report</button>
         </div>
-        ${absentList.length === 0
+        ${absentList.length===0
           ? `<div class="empty-state"><i class="fas fa-check-circle" style="color:var(--success);opacity:.6;"></i><p>No absences recorded today</p></div>`
-          : `<div style="display:flex;flex-wrap:wrap;gap:.5rem;">${absentList.map(n=>`<span class="badge badge-absent"><i class="fas fa-user-times"></i>${n}</span>`).join("")}</div>`
-        }
+          : `<div style="display:flex;flex-wrap:wrap;gap:.5rem;">
+              ${absentList.map(a=>`<span class="badge ${a.gender==="Male"?"badge-teacher":"badge-medical"}">
+                <i class="fas fa-${a.gender==="Male"?"mars":"venus"}"></i> ${a.name}
+              </span>`).join("")}
+            </div>`}
       </div>`;
- 
-    // Charts
+
+    // ── Charts ───────────────────────────────────────────────────
     requestAnimationFrame(() => {
       const pieCtx = document.getElementById("chart-today-pie");
-      if (pieCtx) new Chart(pieCtx, {
-        type: "doughnut",
-        data: { labels:["Present","Absent","Late","Medical"], datasets:[{ data:[presentToday, absentToday, lateToday, 0], backgroundColor:["#10b981","#ef4444","#f97316","#06b6d4"], borderWidth:0 }] },
-        options: { responsive:true, maintainAspectRatio:false, plugins:{ legend:{ labels:{ color:"#94a3b8", font:{ family:"Nunito" } } } }, cutout:"65%" }
+      if (pieCtx && typeof Chart !== "undefined") new Chart(pieCtx, {
+        type:"doughnut",
+        data:{ labels:["Present","Absent","Late","Medical"],
+          datasets:[{ data:[presentToday,absentToday,lateToday,medicalToday],
+            backgroundColor:["#10b981","#ef4444","#f97316","#06b6d4"], borderWidth:0 }]},
+        options:{ responsive:true, maintainAspectRatio:false, cutout:"65%",
+          plugins:{ legend:{ labels:{ color:"#94a3b8", font:{ family:"Nunito",size:11 } } } } }
       });
-      const barCtx = document.getElementById("chart-weekly-bar");
-      const days = ["Mon","Tue","Wed","Thu","Fri","Sat"];
-      const data = [78,85,80,90,88,76].map(v => Math.min(v + Math.floor(Math.random()*5), 100));
-      if (barCtx) new Chart(barCtx, {
-        type:"bar",
-        data:{ labels:days, datasets:[{ label:"Attendance %", data, backgroundColor:"rgba(37,99,235,.7)", borderRadius:6, borderSkipped:false }] },
-        options:{ responsive:true, maintainAspectRatio:false, plugins:{ legend:{ display:false } }, scales:{ x:{ ticks:{ color:"#94a3b8", font:{ family:"Nunito" } }, grid:{ display:false } }, y:{ min:0, max:100, ticks:{ color:"#94a3b8", font:{ family:"Nunito" } }, grid:{ color:"rgba(255,255,255,.05)" } } } }
-      });
+      const genderCtx = document.getElementById("chart-gender-bar");
+      if (genderCtx && typeof Chart !== "undefined") {
+        const cLabels = classArr.map(c=>c.name);
+        const bData   = classArr.map(c=>c.bPct);
+        const gData   = classArr.map(c=>c.gPct);
+        new Chart(genderCtx, {
+          type:"bar",
+          data:{ labels: cLabels.length?cLabels:["No Classes"],
+            datasets:[
+              { label:"Boys %",  data: bData.length?bData:[0], backgroundColor:"rgba(56,189,248,.7)", borderRadius:5, borderSkipped:false },
+              { label:"Girls %", data: gData.length?gData:[0], backgroundColor:"rgba(244,114,182,.7)", borderRadius:5, borderSkipped:false }
+            ]},
+          options:{ responsive:true, maintainAspectRatio:false,
+            plugins:{ legend:{ labels:{ color:"#94a3b8", font:{ family:"Nunito",size:11 } } } },
+            scales:{
+              x:{ ticks:{ color:"#94a3b8", font:{family:"Nunito",size:10} }, grid:{ display:false } },
+              y:{ min:0, max:100, ticks:{ color:"#94a3b8", font:{family:"Nunito",size:10} }, grid:{ color:"rgba(255,255,255,.05)" } }
+            }}
+        });
+      }
     });
   },
- 
+
   // ── ANALYTICS ─────────────────────────────────────────────────
   async renderAnalytics() {
     const pc = document.getElementById("page-content");
     const { db, collection, getDocs } = window.FB;
- 
+
     let classData = [];
     try {
       const classSnap = await getDocs(collection(db, "classes"));
       classSnap.forEach(d => classData.push({ id: d.id, ...d.data() }));
     } catch(e) {}
- 
+
     const labels = classData.length ? classData.map(c => c.name) : ["G6","G7A","G7B","G8A","G8B","G9A","G9B","G10A","G10B","G11"];
     const vals   = labels.map(() => 70 + Math.floor(Math.random() * 28));
- 
+
     pc.innerHTML = `
       <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:1rem;margin-bottom:1.5rem;">
         <div class="glass card">
@@ -1241,7 +1325,7 @@ const APP = {
           </table>
         </div>
       </div>`;
- 
+
     requestAnimationFrame(() => {
       const sorted = labels.map((l,i)=>({l,v:vals[i]})).sort((a,b)=>b.v-a.v);
       const tbody = document.getElementById("class-rank-tbody");
@@ -1261,14 +1345,14 @@ const APP = {
           <td><span class="badge badge-${badge==='success'?'present':badge==='warning'?'late':'absent'}">${pct>=85?"Excellent":pct>=70?"Good":"Needs Attention"}</span></td>
         </tr>`;
       });
- 
+
       const ctx1 = document.getElementById("chart-class-bar");
       if (ctx1) new Chart(ctx1, {
         type:"bar",
         data:{ labels, datasets:[{ data:vals, backgroundColor:vals.map(v=>v>=85?"rgba(16,185,129,.7)":v>=70?"rgba(245,158,11,.7)":"rgba(239,68,68,.7)"), borderRadius:6, borderSkipped:false }] },
         options:{ responsive:true, maintainAspectRatio:false, plugins:{ legend:{ display:false } }, scales:{ x:{ ticks:{ color:"#94a3b8" }, grid:{ display:false } }, y:{ min:0, max:100, ticks:{ color:"#94a3b8" }, grid:{ color:"rgba(255,255,255,.05)" } } } }
       });
- 
+
       const months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
       const trendData = months.map(() => 75 + Math.floor(Math.random() * 20));
       const ctx2 = document.getElementById("chart-monthly-line");
@@ -1279,28 +1363,28 @@ const APP = {
       });
     });
   },
- 
+
   // ── MARK ATTENDANCE ────────────────────────────────────────────
   async renderMarkAttendance() {
     const pc = document.getElementById("page-content");
     const { db, collection, getDocs, query, where, setDoc, doc, serverTimestamp } = window.FB;
     const role = this.userProfile?.role;
     const today = new Date().toISOString().split("T")[0];
- 
+
     // Load classes
     let classes = [];
     try {
       const snap = await getDocs(collection(db, "classes"));
       snap.forEach(d => classes.push({ id: d.id, ...d.data() }));
     } catch(e) {}
- 
+
     // Filter for teacher
     if (role !== "principal" && this.userProfile?.assignedClasses) {
       classes = classes.filter(c => this.userProfile.assignedClasses.includes(c.id));
     }
- 
+
     const classOptions = classes.map(c => `<option value="${c.id}">${c.name}</option>`).join("");
- 
+
     pc.innerHTML = `
       <div class="section-header">
         <h2><i class="fas fa-check-square" style="color:var(--blue-accent);margin-right:.5rem;"></i>Mark Attendance</h2>
@@ -1318,9 +1402,9 @@ const APP = {
           <button class="btn btn-primary" onclick="APP.loadStudentsForAtt()"><i class="fas fa-search"></i> Load Students</button>
         </div>
       </div>
- 
+
       <div id="att-summary-row" class="stats-grid hidden" style="grid-template-columns:repeat(auto-fit,minmax(140px,1fr));margin-bottom:1rem;"></div>
- 
+
       <div id="att-actions-bar" class="hidden" style="display:none;gap:.5rem;flex-wrap:wrap;margin-bottom:1rem;">
         <button class="btn btn-success btn-sm" onclick="APP.markAll('Present')"><i class="fas fa-check-double"></i> All Present</button>
         <button class="btn btn-danger  btn-sm" onclick="APP.markAll('Absent')"><i class="fas fa-times"></i> All Absent</button>
@@ -1329,54 +1413,54 @@ const APP = {
         <button class="btn btn-warning  btn-sm" onclick="APP.renderMonthlySummary(APP.currentAttClass)"><i class="fas fa-calendar-alt"></i> Monthly Summary</button>
         <button class="btn btn-outline  btn-sm" onclick="APP.renderAttCalendar('','')" style="display:none"></button>
       </div>
- 
+
       <div id="att-list-wrap"></div>`;
   },
- 
+
   async loadStudentsForAtt() {
     const classId = document.getElementById("att-class-sel")?.value;
     const date    = document.getElementById("att-date-sel")?.value;
     if (!classId || !date) { this.toast("Select a class and date", "warning"); return; }
- 
+
     const { db, collection, getDocs, query, where } = window.FB;
     const wrap = document.getElementById("att-list-wrap");
     wrap.innerHTML = '<div style="display:flex;justify-content:center;padding:2rem;"><div class="loader-ring"></div></div>';
- 
+
     let students = [];
     try {
       const snap = await getDocs(query(collection(db, "students"), where("classId","==",classId)));
       snap.forEach(d => students.push({ id: d.id, ...d.data() }));
       students.sort((a,b) => (a.indexNo||"").localeCompare(b.indexNo||""));
     } catch(e) { this.toast("Error loading students: "+e.message,"error"); }
- 
+
     // Load existing records
     let existing = {};
     try {
       const aSnap = await getDocs(query(collection(db,"attendance"), where("classId","==",classId), where("date","==",date)));
       aSnap.forEach(d => { const r = d.data(); existing[r.studentId] = r.status; });
     } catch(e) {}
- 
+
     this.currentAttClass = classId;
     this.currentAttDate  = date;
     this.currentStudents = students;
     this.currentAttData  = {};
     students.forEach(s => { this.currentAttData[s.id] = existing[s.id] || "Present"; });
- 
+
     // Summary
     const sumRow = document.getElementById("att-summary-row");
     sumRow.classList.remove("hidden");
     const actBar = document.getElementById("att-actions-bar");
     actBar.style.display = "flex"; actBar.classList.remove("hidden");
- 
+
     if (!students.length) {
       wrap.innerHTML = `<div class="glass card empty-state"><i class="fas fa-user-graduate"></i><p>No students found for this class. Add students first.</p></div>`;
       return;
     }
- 
+
     this.renderAttGrid();
     this.updateAttSummary();
   },
- 
+
   renderAttGrid() {
     const wrap = document.getElementById("att-list-wrap");
     const s = this.currentStudents || [];
@@ -1401,7 +1485,7 @@ const APP = {
         </div>`).join("")
     }</div></div>`;
   },
- 
+
   setAttStatus(studentId, status) {
     this.currentAttData[studentId] = status;
     const row = document.getElementById(`attrow-${studentId}`);
@@ -1411,42 +1495,96 @@ const APP = {
     });
     this.updateAttSummary();
   },
- 
+
   markAll(status) {
     (this.currentStudents||[]).forEach(s => this.setAttStatus(s.id, status));
   },
- 
+
   updateAttSummary() {
     const data = this.currentAttData || {};
-    let present=0, absent=0, late=0, medical=0, boys=0, girls=0, bPres=0, gPres=0;
+    let present=0, absent=0, late=0, medical=0, boys=0, girls=0, bPres=0, gPres=0, bAbsent=0, gAbsent=0;
     (this.currentStudents||[]).forEach(s => {
       const st = data[s.id];
       if (st==="Present") present++;
       if (st==="Absent")  absent++;
       if (st==="Late")    late++;
       if (st==="Medical") medical++;
-      if (s.gender==="Male")   { boys++;  if(st==="Present") bPres++; }
-      if (s.gender==="Female") { girls++; if(st==="Present") gPres++; }
+      if (s.gender==="Male"){
+        boys++;
+        if(st==="Present"||st==="Late") bPres++;
+        if(st==="Absent") bAbsent++;
+      } else {
+        girls++;
+        if(st==="Present"||st==="Late") gPres++;
+        if(st==="Absent") gAbsent++;
+      }
     });
     const total = this.currentStudents?.length || 0;
+    const bPct  = boys  > 0 ? Math.round(bPres/boys*100)  : 0;
+    const gPct  = girls > 0 ? Math.round(gPres/girls*100) : 0;
+    const oPct  = total > 0 ? Math.round((present+late)/total*100) : 0;
+
+    const bar = (pct, color) => `
+      <div style="background:rgba(255,255,255,.08);border-radius:999px;height:6px;margin-top:4px;overflow:hidden;">
+        <div style="height:100%;width:${pct}%;background:${color};border-radius:999px;transition:width .4s;"></div>
+      </div>`;
+
     const sumRow = document.getElementById("att-summary-row");
     if (!sumRow) return;
     sumRow.innerHTML = `
-      <div class="stat-card glass stat-green"><div class="stat-icon"><i class="fas fa-check"></i></div><div class="stat-value">${present}</div><div class="stat-label">Present</div></div>
-      <div class="stat-card glass stat-red"><div class="stat-icon"><i class="fas fa-times"></i></div><div class="stat-value">${absent}</div><div class="stat-label">Absent</div></div>
-      <div class="stat-card glass stat-orange"><div class="stat-icon"><i class="fas fa-clock"></i></div><div class="stat-value">${late}</div><div class="stat-label">Late</div></div>
-      <div class="stat-card glass stat-cyan"><div class="stat-icon"><i class="fas fa-heartbeat"></i></div><div class="stat-value">${medical}</div><div class="stat-label">Medical</div></div>
-      <div class="stat-card glass stat-blue"><div class="stat-icon"><i class="fas fa-mars"></i></div><div class="stat-value">${bPres}/${boys}</div><div class="stat-label">Boys Present</div></div>
-      <div class="stat-card glass stat-blue"><div class="stat-icon"><i class="fas fa-venus"></i></div><div class="stat-value">${gPres}/${girls}</div><div class="stat-label">Girls Present</div></div>`;
+      <div class="stat-card glass stat-green">
+        <div class="stat-icon"><i class="fas fa-check-circle"></i></div>
+        <div class="stat-value">${present}</div>
+        <div class="stat-label">Present</div>
+        ${bar(oPct,'#10b981')}
+        <div style="font-size:.7rem;color:#94a3b8;margin-top:3px;">${oPct}% overall</div>
+      </div>
+      <div class="stat-card glass stat-red">
+        <div class="stat-icon"><i class="fas fa-times-circle"></i></div>
+        <div class="stat-value">${absent}</div>
+        <div class="stat-label">Absent</div>
+        ${bar(total>0?Math.round(absent/total*100):0,'#ef4444')}
+        <div style="font-size:.7rem;color:#94a3b8;margin-top:3px;">${total>0?Math.round(absent/total*100):0}% absent</div>
+      </div>
+      <div class="stat-card glass stat-orange">
+        <div class="stat-icon"><i class="fas fa-clock"></i></div>
+        <div class="stat-value">${late}</div>
+        <div class="stat-label">Late</div>
+      </div>
+      <div class="stat-card glass stat-cyan">
+        <div class="stat-icon"><i class="fas fa-heartbeat"></i></div>
+        <div class="stat-value">${medical}</div>
+        <div class="stat-label">Medical</div>
+      </div>
+      <div class="stat-card glass" style="border:1px solid rgba(56,189,248,.25);background:rgba(56,189,248,.08);">
+        <div class="stat-icon" style="color:#38bdf8;"><i class="fas fa-mars"></i></div>
+        <div class="stat-value" style="color:#38bdf8;">${bPres}<span style="font-size:.8rem;font-weight:600;color:#94a3b8;">/${boys}</span></div>
+        <div class="stat-label">👦 Boys Present</div>
+        ${bar(bPct,'#38bdf8')}
+        <div style="font-size:.72rem;margin-top:3px;display:flex;justify-content:space-between;">
+          <span style="color:#38bdf8;font-weight:700;">${bPct}%</span>
+          <span style="color:#ef4444;">${bAbsent} absent</span>
+        </div>
+      </div>
+      <div class="stat-card glass" style="border:1px solid rgba(244,114,182,.25);background:rgba(244,114,182,.08);">
+        <div class="stat-icon" style="color:#f472b6;"><i class="fas fa-venus"></i></div>
+        <div class="stat-value" style="color:#f472b6;">${gPres}<span style="font-size:.8rem;font-weight:600;color:#94a3b8;">/${girls}</span></div>
+        <div class="stat-label">👧 Girls Present</div>
+        ${bar(gPct,'#f472b6')}
+        <div style="font-size:.72rem;margin-top:3px;display:flex;justify-content:space-between;">
+          <span style="color:#f472b6;font-weight:700;">${gPct}%</span>
+          <span style="color:#ef4444;">${gAbsent} absent</span>
+        </div>
+      </div>`;
   },
- 
+
   async saveAttendance() {
     const { db, setDoc, doc, serverTimestamp } = window.FB;
     const classId = this.currentAttClass;
     const date    = this.currentAttDate;
     const data    = this.currentAttData;
     if (!classId || !date || !data) { this.toast("Nothing to save","warning"); return; }
- 
+
     this.toast("Saving attendance...","info");
     try {
       const promises = Object.entries(data).map(([studentId, status]) => {
@@ -1463,7 +1601,7 @@ const APP = {
       this.toast("Attendance saved successfully!", "success");
     } catch(e) { this.toast("Save failed: "+e.message,"error"); }
   },
- 
+
   printAttendance() {
     const date = this.currentAttDate;
     const classId = this.currentAttClass;
@@ -1477,21 +1615,21 @@ const APP = {
       <script>window.print();<\/script></body></html>`);
     w.document.close();
   },
- 
+
   // ── ATTENDANCE HISTORY ─────────────────────────────────────────
   async renderAttHistory() {
     const pc = document.getElementById("page-content");
     const { db, collection, getDocs, query, where, orderBy } = window.FB;
     const today = new Date().toISOString().split("T")[0];
     const sevenAgo = new Date(Date.now()-7*86400000).toISOString().split("T")[0];
- 
+
     let records = [];
     try {
       const snap = await getDocs(query(collection(db,"attendance"), where("date",">=",sevenAgo)));
       snap.forEach(d => records.push(d.data()));
       records.sort((a,b) => b.date.localeCompare(a.date));
     } catch(e) {}
- 
+
     const rows = records.length ? records.slice(0,200).map(r => `
       <tr>
         <td>${r.date}</td>
@@ -1500,7 +1638,7 @@ const APP = {
         <td><span class="badge badge-${r.status?.toLowerCase()||"absent"}">${r.status||"—"}</span></td>
         <td>${r.markedBy||"—"}</td>
       </tr>`).join("") : `<tr><td colspan="5" class="text-center" style="padding:2rem;color:var(--text-muted);">No records found</td></tr>`;
- 
+
     pc.innerHTML = `
       <div class="section-header">
         <h2>Attendance History</h2>
@@ -1517,7 +1655,7 @@ const APP = {
         </div>
       </div>`;
   },
- 
+
   filterHistoryTable(val) {
     const t = document.getElementById("hist-table");
     if (!t) return;
@@ -1526,7 +1664,7 @@ const APP = {
       r.style.display = r.textContent.toLowerCase().includes(q) ? "" : "none";
     });
   },
- 
+
   // ── REPORTS ────────────────────────────────────────────────────
   async renderReports() {
     const pc = document.getElementById("page-content");
@@ -1552,29 +1690,29 @@ const APP = {
         </div>
       </div>
       <div id="report-output"></div>`;
- 
+
     // Set defaults
     const now = new Date();
     const y = now.getFullYear(), m = String(now.getMonth()+1).padStart(2,"0");
     document.getElementById("rep-from").value = `${y}-${m}-01`;
     document.getElementById("rep-to").value = now.toISOString().split("T")[0];
   },
- 
+
   async generateReport() {
     const from  = document.getElementById("rep-from")?.value;
     const to    = document.getElementById("rep-to")?.value;
     if (!from||!to) { this.toast("Select date range","warning"); return; }
     const { db, collection, getDocs, query, where } = window.FB;
- 
+
     const out = document.getElementById("report-output");
     out.innerHTML = '<div style="display:flex;justify-content:center;padding:2rem;"><div class="loader-ring"></div></div>';
- 
+
     let records = [];
     try {
       const snap = await getDocs(query(collection(db,"attendance"), where("date",">=",from), where("date","<=",to)));
       snap.forEach(d => records.push(d.data()));
     } catch(e) {}
- 
+
     // Summarise by student
     const summary = {};
     records.forEach(r => {
@@ -1585,7 +1723,7 @@ const APP = {
       else if (r.status==="Late") s.late++;
       else if (r.status==="Medical") s.medical++;
     });
- 
+
     const rows = Object.values(summary).map(s => {
       const total = s.present+s.absent+s.late+s.medical;
       const pct = total ? Math.round((s.present/total)*100) : 0;
@@ -1602,7 +1740,7 @@ const APP = {
         </td>
       </tr>`;
     }).join("");
- 
+
     out.innerHTML = `
       <div class="glass card">
         <div class="section-header">
@@ -1616,7 +1754,7 @@ const APP = {
         </div>
       </div>`;
   },
- 
+
   downloadReportPDF() {
     const t = document.querySelector("#report-output table");
     if (!t) { this.toast("Generate a report first","warning"); return; }
@@ -1627,12 +1765,12 @@ const APP = {
       <script>window.print();<\/script></body></html>`);
     w.document.close();
   },
- 
+
   // ── STUDENTS ───────────────────────────────────────────────────
   async renderStudents() {
     const pc = document.getElementById("page-content");
     const { db, collection, getDocs } = window.FB;
- 
+
     let students = [], classes = [];
     try {
       const [sSnap, cSnap] = await Promise.all([getDocs(collection(db,"students")), getDocs(collection(db,"classes"))]);
@@ -1647,18 +1785,18 @@ const APP = {
       </div>`;
       return;
     }
- 
+
     // Filter for teachers' assigned classes
     if (this.userProfile?.role !== "principal" && this.userProfile?.assignedClasses?.length) {
       students = students.filter(s => this.userProfile.assignedClasses.includes(s.classId));
     }
- 
+
     const canManage = this.userProfile?.role === "principal" || this.userProfile?.permissions?.manageStudents;
     const classOpts = classes.map(c => `<option value="${c.id}">${c.name}</option>`).join("");
- 
+
     // Sort students by class then name
     students.sort((a,b) => (a.classId||"").localeCompare(b.classId||"") || (a.name||"").localeCompare(b.name||""));
- 
+
     pc.innerHTML = `
       <div class="section-header">
         <h2>Students <span style="color:var(--text-muted);font-weight:600;">(${students.length})</span></h2>
@@ -1684,7 +1822,7 @@ const APP = {
         }
       </div>`;
   },
- 
+
   studentCardHTML(s) {
     const initials = (s.name||"S").split(" ").map(n=>n[0]).join("").toUpperCase().slice(0,2);
     const canEdit = this.userProfile?.role === "principal" || this.userProfile?.permissions?.manageStudents;
@@ -1711,28 +1849,28 @@ const APP = {
         </div>
       </div>`;
   },
- 
+
   filterStudentCards(val) {
     const q = val.toLowerCase();
     document.querySelectorAll(".student-card").forEach(c => {
       c.style.display = c.textContent.toLowerCase().includes(q) ? "" : "none";
     });
   },
- 
+
   filterStudentsByClass(classId) {
     document.querySelectorAll(".student-card").forEach(c => {
       c.style.display = (!classId || c.dataset.class === classId) ? "" : "none";
     });
   },
- 
+
   async showAddStudentModal() {
     const { db, collection, getDocs } = window.FB;
     let classes = [];
     try { const s=await getDocs(collection(db,"classes")); s.forEach(d=>classes.push({id:d.id,...d.data()})); } catch(e) {}
- 
+
     const noClasses = classes.length === 0;
     const clsOpts = classes.map(c=>`<option value="${c.id}">${c.name}</option>`).join("");
- 
+
     this.modal("➕ Add New Student", `
       ${noClasses ? `<div style="background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.3);border-radius:10px;padding:.75rem 1rem;margin-bottom:1rem;font-size:.82rem;color:#fbbf24;">
         <i class="fas fa-exclamation-triangle"></i> <strong>No classes found.</strong> You need to create at least one class first.
@@ -1740,7 +1878,7 @@ const APP = {
           <i class="fas fa-plus"></i> Go to Classes
         </button>
       </div>` : ""}
- 
+
       <div class="input-group"><label>Full Name *</label>
         <input type="text" class="form-control" id="ns-name" placeholder="e.g. Kamal Perera" autofocus/>
       </div>
@@ -1789,19 +1927,19 @@ const APP = {
     // Focus name field
     setTimeout(()=>document.getElementById("ns-name")?.focus(), 150);
   },
- 
+
   async saveNewStudent() {
     const name    = document.getElementById("ns-name")?.value.trim();
     const index   = document.getElementById("ns-index")?.value.trim();
     const gender  = document.getElementById("ns-gender")?.value;
     const classEl = document.getElementById("ns-class");
     const classId = classEl?.value.trim();
- 
+
     if (!name)    { this.toast("Full name is required","warning"); document.getElementById("ns-name")?.focus(); return; }
     if (!classId) { this.toast("Please select or enter a class","warning"); classEl?.focus(); return; }
- 
+
     const { db, collection, addDoc, doc, setDoc, getDocs, serverTimestamp } = window.FB;
- 
+
     // If class was typed (no classes existed), auto-create it
     if (classEl.tagName === "INPUT") {
       const existingSnap = await getDocs(collection(db,"classes")).catch(()=>null);
@@ -1812,7 +1950,7 @@ const APP = {
         catch(e) {}
       }
     }
- 
+
     try {
       await addDoc(collection(db,"students"), {
         name, indexNo: index, gender,
@@ -1832,7 +1970,7 @@ const APP = {
       this.toast("Error saving student: " + e.message, "error");
     }
   },
- 
+
   async showEditStudentModal(id) {
     const { db, doc, getDoc, collection, getDocs } = window.FB;
     let s = null, classes = [];
@@ -1841,7 +1979,7 @@ const APP = {
       s = sSnap.data(); cSnap.forEach(d=>classes.push({id:d.id,...d.data()}));
     } catch(e) { this.toast("Error loading student","error"); return; }
     if (!s) return;
- 
+
     const clsOpts = classes.map(c=>`<option value="${c.id}" ${c.id===s.classId?"selected":""}>${c.name}</option>`).join("");
     this.modal("Edit Student", `
       <div class="input-group"><label>Full Name *</label><input type="text" class="form-control" id="es-name" value="${s.name||""}"/></div>
@@ -1863,7 +2001,7 @@ const APP = {
        <button class="btn btn-primary" onclick="APP.saveEditStudent('${id}')"><i class="fas fa-save"></i> Save Changes</button>`
     );
   },
- 
+
   async saveEditStudent(id) {
     const { db, doc, updateDoc } = window.FB;
     try {
@@ -1883,19 +2021,19 @@ const APP = {
       this.renderStudents();
     } catch(e) { this.toast("Error: "+e.message,"error"); }
   },
- 
+
   async deleteStudent(id) {
     if (!confirm("Delete this student? This cannot be undone.")) return;
     const { db, doc, deleteDoc } = window.FB;
     try { await deleteDoc(doc(db,"students",id)); this.toast("Student deleted","info"); this.renderStudents(); }
     catch(e) { this.toast("Error: "+e.message,"error"); }
   },
- 
+
   // ── TEACHERS ───────────────────────────────────────────────────
   async renderTeachers() {
     const pc = document.getElementById("page-content");
     const teachers = window.AUTH.getTeachers();
- 
+
     pc.innerHTML = `
       <div class="section-header">
         <h2>Teacher Accounts (${teachers.length})</h2>
@@ -1926,17 +2064,17 @@ const APP = {
         </div>
       </div>`;
   },
- 
+
   async showAddTeacherModal() {
     const { db, collection, getDocs } = window.FB;
     let classes = [];
     try { const s=await getDocs(collection(db,"classes")); s.forEach(d=>classes.push({id:d.id,...d.data()})); } catch(e) {}
- 
+
     const clsChecks = classes.map(c=>`
       <label class="perm-item">
         <input type="checkbox" class="tc-class" value="${c.id}"> ${c.name}
       </label>`).join("");
- 
+
     this.modal("Add Teacher Account", `
       <div class="input-group"><label>Display Name *</label><input type="text" class="form-control" id="nt-name" placeholder="Mr. / Ms. Full Name"/></div>
       <div class="input-group"><label>Username (for login) *</label><input type="text" class="form-control" id="nt-email" placeholder="e.g. teacher@whc.lk"/></div>
@@ -1962,13 +2100,13 @@ const APP = {
        <button class="btn btn-primary" onclick="APP.saveNewTeacher()"><i class="fas fa-save"></i> Save Teacher</button>`
     );
   },
- 
+
   async saveNewTeacher() {
     const name  = document.getElementById("nt-name")?.value.trim();
     const email = document.getElementById("nt-email")?.value.trim();
     const pass  = document.getElementById("nt-pass")?.value;
     if (!name||!email||!pass) { this.toast("Name, username, and password are required","warning"); return; }
- 
+
     const assignedClasses = [...document.querySelectorAll(".tc-class:checked")].map(c=>c.value);
     const permissions = {
       markAttendance:  document.getElementById("pp-markAtt")?.checked||false,
@@ -1977,7 +2115,7 @@ const APP = {
       viewHistory:     document.getElementById("pp-viewHistory")?.checked||false,
       viewReports:     document.getElementById("pp-viewReports")?.checked||false,
     };
- 
+
     const teachers = window.AUTH.getTeachers();
     if (teachers.find(t => t.username === email)) { this.toast("Username already exists","warning"); return; }
     const id = "t_" + Date.now();
@@ -1987,23 +2125,23 @@ const APP = {
     this.closeModal();
     this.renderTeachers();
   },
- 
+
   async showEditTeacherModal(id) {
     const teachers = window.AUTH.getTeachers();
     const t = teachers.find(x => x.id === id);
     if (!t) { this.toast("Teacher not found","error"); return; }
- 
+
     const { db, collection, getDocs } = window.FB;
     let classes = [];
     try { const s=await getDocs(collection(db,"classes")); s.forEach(d=>classes.push({id:d.id,...d.data()})); } catch(e) {}
     const p = t.permissions||{};
     const ac = t.assignedClasses||[];
- 
+
     const clsChecks = classes.map(c=>`
       <label class="perm-item">
         <input type="checkbox" class="etc-class" value="${c.id}" ${ac.includes(c.id)?"checked":""}> ${c.name}
       </label>`).join("");
- 
+
     this.modal("Edit Teacher: "+t.name, `
       <div class="input-group"><label>Display Name</label><input type="text" class="form-control" id="et-name" value="${t.name||""}"/></div>
       <div class="input-group"><label>Username (login)</label><input type="text" class="form-control" id="et-email" value="${t.username||""}"/></div>
@@ -2026,12 +2164,12 @@ const APP = {
        <button class="btn btn-primary" onclick="APP.saveEditTeacher('${id}')"><i class="fas fa-save"></i> Save Changes</button>`
     );
   },
- 
+
   async saveEditTeacher(id) {
     const teachers = window.AUTH.getTeachers();
     const idx = teachers.findIndex(x => x.id === id);
     if (idx === -1) { this.toast("Teacher not found","error"); return; }
- 
+
     const newPass = document.getElementById("et-pass")?.value;
     const assignedClasses = [...document.querySelectorAll(".etc-class:checked")].map(c=>c.value);
     const permissions = {
@@ -2041,7 +2179,7 @@ const APP = {
       viewHistory:     document.getElementById("ep-viewHistory")?.checked||false,
       viewReports:     document.getElementById("ep-viewReports")?.checked||false,
     };
- 
+
     teachers[idx] = {
       ...teachers[idx],
       name: document.getElementById("et-name")?.value.trim() || teachers[idx].name,
@@ -2054,7 +2192,7 @@ const APP = {
     this.closeModal();
     this.renderTeachers();
   },
- 
+
   async deleteTeacher(id) {
     if (!confirm("Delete this teacher account? They will no longer be able to log in.")) return;
     const teachers = window.AUTH.getTeachers().filter(t => t.id !== id);
@@ -2062,15 +2200,15 @@ const APP = {
     this.toast("Teacher removed","info");
     this.renderTeachers();
   },
- 
+
   // ── CLASSES ────────────────────────────────────────────────────
   async renderClasses() {
     const pc = document.getElementById("page-content");
     const { db, collection, getDocs } = window.FB;
- 
+
     let classes = [];
     try { const snap = await getDocs(collection(db,"classes")); snap.forEach(d=>classes.push({id:d.id,...d.data()})); } catch(e) {}
- 
+
     // Auto-seed default classes if none exist
     if (classes.length === 0) {
       const defaults = ["Grade 6","Grade 7A","Grade 7B","Grade 7E","Grade 8A","Grade 8B","Grade 9A","Grade 9B","Grade 10A","Grade 10B","Grade 11"];
@@ -2082,7 +2220,7 @@ const APP = {
       }
       this.toast("Default classes created!","success");
     }
- 
+
     pc.innerHTML = `
       <div class="section-header">
         <h2>Class Management</h2>
@@ -2105,7 +2243,7 @@ const APP = {
           </div>`).join("")}
       </div>`;
   },
- 
+
   showAddClassModal() {
     this.modal("Add New Class", `
       <div class="input-group"><label>Class Name *</label><input type="text" class="form-control" id="nc-name" placeholder="e.g. Grade 12A"/></div>`,
@@ -2113,7 +2251,7 @@ const APP = {
        <button class="btn btn-primary" onclick="APP.saveNewClass()"><i class="fas fa-save"></i> Add Class</button>`
     );
   },
- 
+
   async saveNewClass() {
     const name = document.getElementById("nc-name")?.value.trim();
     if (!name) { this.toast("Class name required","warning"); return; }
@@ -2124,7 +2262,7 @@ const APP = {
       this.toast("Class added!","success"); this.closeModal(); this.renderClasses();
     } catch(e) { this.toast("Error: "+e.message,"error"); }
   },
- 
+
   showRenameClassModal(id, currentName) {
     this.modal("Rename Class", `
       <div class="input-group"><label>New Name *</label><input type="text" class="form-control" id="rc-name" value="${currentName}"/></div>`,
@@ -2132,7 +2270,7 @@ const APP = {
        <button class="btn btn-primary" onclick="APP.saveRenameClass('${id}')"><i class="fas fa-save"></i> Rename</button>`
     );
   },
- 
+
   async saveRenameClass(id) {
     const name = document.getElementById("rc-name")?.value.trim();
     if (!name) { this.toast("Name required","warning"); return; }
@@ -2142,14 +2280,14 @@ const APP = {
       this.toast("Renamed!","success"); this.closeModal(); this.renderClasses();
     } catch(e) { this.toast("Error: "+e.message,"error"); }
   },
- 
+
   async deleteClass(id) {
     if (!confirm("Delete this class?")) return;
     const { db, doc, deleteDoc } = window.FB;
     try { await deleteDoc(doc(db,"classes",id)); this.toast("Class deleted","info"); this.renderClasses(); }
     catch(e) { this.toast("Error: "+e.message,"error"); }
   },
- 
+
   // ── SETTINGS ───────────────────────────────────────────────────
   renderSettings() {
     const pc = document.getElementById("page-content");
@@ -2158,7 +2296,7 @@ const APP = {
     pc.innerHTML = `
       <div class="section-header"><h2>System Settings</h2></div>
       <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:1rem;">
- 
+
         <div class="glass card">
           <h3 style="font-size:.95rem;font-weight:800;margin-bottom:1rem;"><i class="fas fa-user-cog" style="color:var(--blue-accent);margin-right:.5rem;"></i>Principal Credentials</h3>
           <div class="input-group"><label>Display Name</label><input type="text" class="form-control" id="set-name" value="${u.name||""}"/></div>
@@ -2171,7 +2309,7 @@ const APP = {
           </div>
           <button class="btn btn-primary btn-sm" onclick="APP.saveProfileSettings()"><i class="fas fa-save"></i> Save Changes</button>
         </div>
- 
+
         <div class="glass card">
           <h3 style="font-size:.95rem;font-weight:800;margin-bottom:1rem;"><i class="fas fa-palette" style="color:var(--cyan);margin-right:.5rem;"></i>Appearance</h3>
           <div style="display:flex;align-items:center;justify-content:space-between;padding:.75rem 0;border-bottom:1px solid var(--glass-border);">
@@ -2181,7 +2319,7 @@ const APP = {
             </button>
           </div>
         </div>
- 
+
         <div class="glass card">
           <h3 style="font-size:.95rem;font-weight:800;margin-bottom:1rem;"><i class="fas fa-database" style="color:var(--warning);margin-right:.5rem;"></i>Data Management</h3>
           <p style="font-size:.82rem;color:var(--text-muted);margin-bottom:1rem;">Export or manage system data. Use with caution.</p>
@@ -2190,13 +2328,13 @@ const APP = {
             <button class="btn btn-danger  btn-sm" onclick="APP.confirmClearData()"><i class="fas fa-trash"></i> Clear All Data</button>
           </div>
         </div>
- 
+
         <div class="glass card">
           <h3 style="font-size:.95rem;font-weight:800;margin-bottom:1rem;"><i class="fas fa-book" style="color:var(--success);margin-right:.5rem;"></i>Setup Guide</h3>
           <p style="font-size:.82rem;color:var(--text-muted);margin-bottom:1rem;">Step-by-step Firestore setup instructions.</p>
           <button class="btn btn-success btn-sm" onclick="APP.showSetupGuide()"><i class="fas fa-book-open"></i> View Setup Guide</button>
         </div>
- 
+
         <div class="glass card">
           <h3 style="font-size:.95rem;font-weight:800;margin-bottom:1rem;"><i class="fas fa-shield-alt" style="color:var(--danger);margin-right:.5rem;"></i>Session Info</h3>
           <p style="font-size:.8rem;color:var(--text-muted);line-height:1.9;">
@@ -2210,7 +2348,7 @@ const APP = {
         </div>
       </div>`;
   },
- 
+
   saveProfileSettings() {
     const name     = document.getElementById("set-name")?.value.trim();
     const username = document.getElementById("set-username")?.value.trim();
@@ -2219,13 +2357,13 @@ const APP = {
     if (!name) { this.toast("Name required","warning"); return; }
     if (!username) { this.toast("Username required","warning"); return; }
     if (newPass && newPass !== newPass2) { this.toast("Passwords do not match","error"); return; }
- 
+
     const principal = window.AUTH.getPrincipal();
     principal.name     = name;
     principal.username = username;
     if (newPass) principal.password = newPass;
     window.AUTH.savePrincipal(principal);
- 
+
     // Update current session
     this.userProfile.name = name;
     this.currentUser.name = name;
@@ -2236,7 +2374,7 @@ const APP = {
     this.toast("Credentials updated! Use new username/password next login.","success");
     this.renderSettings();
   },
- 
+
   async exportData() {
     this.toast("Preparing export...","info");
     const { db, collection, getDocs } = window.FB;
@@ -2258,13 +2396,13 @@ const APP = {
       this.toast("Export ready!","success");
     } catch(e) { this.toast("Error: "+e.message,"error"); }
   },
- 
+
   confirmClearData() {
     if (!confirm("⚠️ This will delete ALL student and attendance data permanently. Are you absolutely sure?")) return;
     if (!confirm("Second confirmation: This CANNOT be undone. Continue?")) return;
     this.toast("Clear feature disabled in this demo for safety","warning");
   },
- 
+
   // ================================================================
   // ATTENDANCE CALENDAR (monthly view per student)
   // ================================================================
@@ -2272,11 +2410,11 @@ const APP = {
     const now  = new Date();
     const year = now.getFullYear();
     const month= now.getMonth(); // 0-indexed
- 
+
     const { db, collection, query, where, getDocs } = window.FB;
     const from = `${year}-${String(month+1).padStart(2,"0")}-01`;
     const to   = `${year}-${String(month+1).padStart(2,"0")}-31`;
- 
+
     let records = {};
     try {
       const snap = await getDocs(query(
@@ -2287,14 +2425,14 @@ const APP = {
       ));
       snap.forEach(d => { const r=d.data(); records[r.date]=r.status; });
     } catch(e) {}
- 
+
     const daysInMonth = new Date(year,month+1,0).getDate();
     const firstDay    = new Date(year,month,1).getDay(); // 0=Sun
     const monthName   = now.toLocaleString("default",{month:"long"});
- 
+
     const statusColor = { Present:"var(--success)", Absent:"var(--danger)", Late:"var(--late)", Medical:"var(--cyan)" };
     const statusIcon  = { Present:"✓", Absent:"✗", Late:"⏰", Medical:"❤" };
- 
+
     // Build grid cells
     let cells = "";
     for (let i=0;i<firstDay;i++) cells += `<div></div>`;
@@ -2313,7 +2451,7 @@ const APP = {
         <span style="font-size:.8rem;">${icon}</span>
       </div>`;
     }
- 
+
     // Count stats
     const present = Object.values(records).filter(v=>v==="Present").length;
     const absent  = Object.values(records).filter(v=>v==="Absent").length;
@@ -2321,7 +2459,7 @@ const APP = {
     const medical = Object.values(records).filter(v=>v==="Medical").length;
     const total   = present+absent+late+medical;
     const pct     = total ? Math.round((present/total)*100) : 0;
- 
+
     this.modal(`📅 Calendar — ${studentName}`, `
       <div style="text-align:center;margin-bottom:1rem;">
         <h3 style="font-size:1rem;font-weight:800;">${monthName} ${year}</h3>
@@ -2346,7 +2484,7 @@ const APP = {
         </div>
       </div>`, ``);
   },
- 
+
   // ================================================================
   // STUDENT FULL PROFILE VIEW
   // ================================================================
@@ -2355,7 +2493,7 @@ const APP = {
     let s = null;
     try { const snap = await getDoc(doc(db,"students",studentId)); s = snap.data(); } catch(e) {}
     if (!s) { this.toast("Student not found","error"); return; }
- 
+
     // Get last 30 attendance records
     const today = new Date().toISOString().split("T")[0];
     const ago30 = new Date(Date.now()-30*86400000).toISOString().split("T")[0];
@@ -2369,11 +2507,11 @@ const APP = {
       });
       records.sort((a,b)=>b.date.localeCompare(a.date));
     } catch(e) {}
- 
+
     const total = present+absent+late;
     const pct   = total ? Math.round((present/total)*100) : 0;
     const initials = (s.name||"S").split(" ").map(n=>n[0]).join("").toUpperCase().slice(0,2);
- 
+
     this.modal(`Student Profile`, `
       <div style="text-align:center;margin-bottom:1.25rem;">
         <div style="width:80px;height:80px;border-radius:20px;background:linear-gradient(135deg,var(--blue-light),var(--cyan));
@@ -2419,12 +2557,12 @@ const APP = {
        <button class="btn btn-primary" onclick="APP.closeModal();APP.renderAttCalendar('${studentId}','${s.name}')"><i class="fas fa-calendar"></i> View Calendar</button>`
     );
   },
- 
+
   // ================================================================
   // NOTIFICATIONS PANEL
   // ================================================================
   notifications: [],
- 
+
   async loadNotifications() {
     const { db, collection, query, where, getDocs } = window.FB;
     const today = new Date().toISOString().split("T")[0];
@@ -2447,7 +2585,7 @@ const APP = {
     } catch(e) {}
     return this.notifications;
   },
- 
+
   async showNotificationsPanel() {
     await this.loadNotifications();
     const n = this.notifications;
@@ -2465,7 +2603,7 @@ const APP = {
       }`, ``
     );
   },
- 
+
   // ================================================================
   // MONTHLY SUMMARY (auto-generated)
   // ================================================================
@@ -2475,7 +2613,7 @@ const APP = {
     const month = now.getMonth()+1;
     const from  = `${year}-${String(month).padStart(2,"0")}-01`;
     const to    = `${year}-${String(month).padStart(2,"0")}-31`;
- 
+
     const { db, collection, query, where, getDocs } = window.FB;
     let students=[], records=[];
     try {
@@ -2486,7 +2624,7 @@ const APP = {
       sSnap.forEach(d=>students.push({id:d.id,...d.data()}));
       aSnap.forEach(d=>records.push(d.data()));
     } catch(e) {}
- 
+
     const summary = {};
     students.forEach(s=>{summary[s.id]={name:s.name,indexNo:s.indexNo,gender:s.gender,present:0,absent:0,late:0,medical:0};});
     records.forEach(r=>{
@@ -2494,7 +2632,7 @@ const APP = {
       const k = r.status?.toLowerCase();
       if(summary[r.studentId][k]!==undefined) summary[r.studentId][k]++;
     });
- 
+
     const rows = Object.values(summary).map(s=>{
       const total = s.present+s.absent+s.late+s.medical;
       const pct   = total?Math.round((s.present/total)*100):0;
@@ -2509,7 +2647,7 @@ const APP = {
         <td><span style="font-weight:800;color:${pct>=85?"var(--success)":pct>=70?"var(--warning)":"var(--danger)"};">${pct}%</span></td>
       </tr>`;
     }).join("");
- 
+
     this.modal(`Monthly Summary — ${now.toLocaleString("default",{month:"long"})} ${year}`, `
       <div class="table-wrapper" style="max-height:420px;overflow-y:auto;">
         <table>
@@ -2521,7 +2659,7 @@ const APP = {
        <button class="btn btn-success" onclick="APP.printMonthlySummaryTable()"><i class="fas fa-print"></i> Print</button>`
     );
   },
- 
+
   printMonthlySummaryTable() {
     const t = document.querySelector(".modal .table-wrapper table");
     if (!t) return;
@@ -2531,7 +2669,7 @@ const APP = {
       <body><h2>BD/Hindu College Welimada — Monthly Summary</h2>${t.outerHTML}<script>window.print();<\/script></body></html>`);
     w.document.close();
   },
- 
+
   // ================================================================
   // GLOBAL SEARCH
   // ================================================================
@@ -2546,14 +2684,14 @@ const APP = {
     );
     setTimeout(()=>document.getElementById("gs-input")?.focus(),100);
   },
- 
+
   async doGlobalSearch(val) {
     const out = document.getElementById("gs-results");
     if (!out) return;
     if (val.length < 2) { out.innerHTML = `<p style="color:var(--text-muted);font-size:.85rem;text-align:center;">Type at least 2 characters</p>`; return; }
     const q = val.toLowerCase();
     out.innerHTML = `<div style="display:flex;justify-content:center;padding:1rem;"><div class="loader-ring" style="width:32px;height:32px;border-width:3px;"></div></div>`;
- 
+
     const { db, collection, getDocs } = window.FB;
     let results = [];
     try {
@@ -2563,9 +2701,9 @@ const APP = {
     // Search local teachers
     const teachers = window.AUTH.getTeachers();
     teachers.forEach(t => { if((t.name||"").toLowerCase().includes(q)) results.push({type:"teacher",id:t.id,name:t.name}); });
- 
+
     if (!results.length) { out.innerHTML = `<p style="color:var(--text-muted);font-size:.85rem;text-align:center;">No results for "${val}"</p>`; return; }
- 
+
     out.innerHTML = results.slice(0,12).map(r => `
       <div style="display:flex;align-items:center;gap:.75rem;padding:.7rem;border-radius:10px;background:var(--glass-bg);border:1px solid var(--glass-border);margin-bottom:.4rem;cursor:pointer;"
         onclick="${r.type==="student"?`APP.closeModal();APP.showStudentProfile('${r.id}')`:``}">
@@ -2581,7 +2719,7 @@ const APP = {
         <span class="badge ${r.type==="student"?"badge-teacher":"badge-admin"}" style="margin-left:auto;">${r.type}</span>
       </div>`).join("");
   },
- 
+
   // ================================================================
   // SETUP GUIDE (shown from Settings)
   // ================================================================
@@ -2591,16 +2729,16 @@ const APP = {
         <div style="background:rgba(16,185,129,.1);border:1px solid rgba(16,185,129,.3);border-radius:10px;padding:.75rem 1rem;margin-bottom:1rem;color:#34d399;">
           <i class="fas fa-check-circle"></i> <strong>Firebase Authentication is NOT required.</strong> Login is handled locally — no billing triggered.
         </div>
- 
+
         <h4 style="color:var(--white);margin-bottom:.5rem;">Step 1 — Create Firebase Project</h4>
         <p>Go to <a href="https://console.firebase.google.com" target="_blank" style="color:var(--sky);">console.firebase.google.com</a> → Add Project → Follow steps.</p>
- 
+
         <h4 style="color:var(--white);margin:1rem 0 .5rem;">Step 2 — Enable Firestore Only</h4>
         <p>Firestore Database → Create database → Start in <strong>test mode</strong>. <strong>Skip Authentication entirely.</strong></p>
- 
+
         <h4 style="color:var(--white);margin:1rem 0 .5rem;">Step 3 — Copy Config</h4>
         <p>Project Settings ⚙ → Your Apps → Web App (</> icon) → Register → Copy <code style="color:var(--sky);">firebaseConfig</code> → Paste into this file at the top.</p>
- 
+
         <h4 style="color:var(--white);margin:1rem 0 .5rem;">Step 4 — Firestore Security Rules</h4>
         <pre style="background:rgba(0,0,0,.4);border-radius:10px;padding:1rem;font-size:.73rem;color:var(--sky);overflow-x:auto;line-height:1.6;">rules_version = '2';
 service cloud.firestore {
@@ -2610,19 +2748,19 @@ service cloud.firestore {
     }
   }
 }</pre>
- 
+
         <h4 style="color:var(--white);margin:1rem 0 .5rem;">Step 5 — Login Credentials</h4>
         <p>Default principal login: <code style="color:var(--sky);">principal@whc.lk</code> / <code style="color:var(--sky);">principal@1221</code><br>
         Change these anytime from <strong>Settings → Principal Credentials</strong>.<br>
         Add teacher accounts from <strong>Teachers → Add Teacher</strong>.</p>
- 
+
         <h4 style="color:var(--white);margin:1rem 0 .5rem;">Deploy to GitHub Pages</h4>
         <p>Push this file to a GitHub repo → Settings → Pages → Deploy from main branch. Done!</p>
       </div>`, ``
     );
   },
 }; // end APP
- 
+
 // ── Keyboard shortcut: Ctrl+K → Global Search ──────────────────────
 document.addEventListener("keydown", e => {
   if ((e.ctrlKey||e.metaKey) && e.key==="k") {
@@ -2630,7 +2768,7 @@ document.addEventListener("keydown", e => {
     if (APP.currentUser) APP.showGlobalSearch();
   }
 });
- 
+
 // ── Enter key on login ────────────────────────────────────────────
 document.addEventListener("keydown", e => {
   if (e.key==="Enter" && !document.getElementById("page-login")?.classList.contains("hidden")) APP.login();
@@ -2638,3 +2776,4 @@ document.addEventListener("keydown", e => {
 </script>
 </body>
 </html>
+
