@@ -975,6 +975,7 @@ const APP = {
         { panel:"mark-attendance", icon:"fas fa-check-square", label:"Mark Attendance" },
         { panel:"att-history",     icon:"fas fa-history",      label:"History" },
         { panel:"att-reports",     icon:"fas fa-file-alt",     label:"Reports" },
+        { panel:"class-register",  icon:"fas fa-list-ol",      label:"Class Register" },
       ]},
       { title: "People", items: [
         { panel:"students",  icon:"fas fa-user-graduate", label:"Students" },
@@ -994,6 +995,7 @@ const APP = {
     if (perms.viewHistory)   items.push({ panel:"att-history", icon:"fas fa-history", label:"History" });
     if (perms.manageStudents) items.push({ panel:"students",   icon:"fas fa-user-graduate", label:"Students" });
     if (perms.viewReports)   items.push({ panel:"att-reports", icon:"fas fa-file-alt", label:"Reports" });
+    items.push({ panel:"class-register", icon:"fas fa-list-ol", label:"Class Register" });
     return [{ title: "Menu", items }];
   },
 
@@ -1007,7 +1009,7 @@ const APP = {
       "mark-attendance": "Mark Attendance", "att-history": "Attendance History",
       "att-reports": "Attendance Reports", students: "Student Profiles",
       teachers: "Teacher Management", classes: "Class Management",
-      settings: "System Settings"
+      settings: "System Settings", "class-register": "Class Register"
     };
     document.getElementById("page-title").textContent = titles[panel] || panel;
     const pc = document.getElementById("page-content");
@@ -1022,6 +1024,7 @@ const APP = {
       teachers: () => this.renderTeachers(),
       classes: () => this.renderClasses(),
       settings: () => this.renderSettings(),
+      "class-register": () => this.renderClassRegister(),
     };
     setTimeout(() => { if (methods[panel]) methods[panel](); else pc.innerHTML = `<p>Coming soon</p>`; }, 200);
     // close mobile
@@ -2759,6 +2762,270 @@ service cloud.firestore {
       </div>`, ``
     );
   },
+  // ================================================================
+  // CLASS REGISTER — Boys & Girls separately, drag-order by ▲▼
+  // ================================================================
+  async renderClassRegister() {
+    const pc = document.getElementById("page-content");
+    const { db, collection, getDocs } = window.FB;
+
+    let classes = [];
+    try {
+      const snap = await getDocs(collection(db,"classes"));
+      snap.forEach(d => classes.push({ id:d.id, ...d.data() }));
+      classes.sort((a,b)=>(a.name||"").localeCompare(b.name||""));
+    } catch(e) {
+      pc.innerHTML = `<div class="glass card empty-state" style="margin-top:2rem;"><i class="fas fa-database" style="color:var(--warning);opacity:.7;"></i><p style="color:var(--warning);font-weight:700;">Firestore not connected</p></div>`;
+      return;
+    }
+
+    const classOpts = classes.map(c=>`<option value="${c.id}">${c.name}</option>`).join("");
+
+    pc.innerHTML = `
+      <div class="section-header">
+        <h2><i class="fas fa-list-ol" style="color:var(--blue-accent);margin-right:.5rem;"></i>Class Register</h2>
+        <div class="flex gap-3 items-center" style="flex-wrap:wrap;">
+          <select class="form-control" id="reg-class-sel" style="width:auto;padding:.5rem .9rem;font-size:.9rem;" onchange="APP.loadClassRegister(this.value)">
+            <option value="">— Select Class —</option>${classOpts}
+          </select>
+          <button class="btn btn-outline btn-sm" id="reg-print-btn" style="display:none;" onclick="APP.printClassRegister()">
+            <i class="fas fa-print"></i> Print Register
+          </button>
+          <button class="btn btn-success btn-sm" id="reg-save-btn" style="display:none;" onclick="APP.saveRegisterOrder()">
+            <i class="fas fa-save"></i> Save Order
+          </button>
+        </div>
+      </div>
+      <div id="reg-content">
+        <div class="glass card empty-state" style="margin-top:1rem;">
+          <i class="fas fa-list-ol" style="opacity:.3;"></i>
+          <p>Select a class to view its register</p>
+        </div>
+      </div>`;
+  },
+
+  async loadClassRegister(classId) {
+    if (!classId) return;
+    const rc = document.getElementById("reg-content");
+    rc.innerHTML = '<div style="display:flex;justify-content:center;padding:3rem;"><div class="loader-ring"></div></div>';
+
+    const { db, collection, getDocs, query, where } = window.FB;
+    let students = [];
+    try {
+      const snap = await getDocs(query(collection(db,"students"), where("classId","==",classId)));
+      snap.forEach(d => students.push({ id:d.id, ...d.data() }));
+    } catch(e) { this.toast("Error loading students: "+e.message,"error"); return; }
+
+    if (!students.length) {
+      rc.innerHTML = `<div class="glass card empty-state" style="margin-top:1rem;"><i class="fas fa-user-graduate"></i><p>No students found in this class.</p></div>`;
+      return;
+    }
+
+    // Separate boys and girls, sort by registerOrder if set, else by indexNo/name
+    const sort = arr => arr.sort((a,b)=>{
+      if (a.registerOrder != null && b.registerOrder != null) return a.registerOrder - b.registerOrder;
+      if (a.registerOrder != null) return -1;
+      if (b.registerOrder != null) return 1;
+      return (a.indexNo||a.name||"").localeCompare(b.indexNo||b.name||"");
+    });
+
+    const boys  = sort(students.filter(s => s.gender === "Male"));
+    const girls = sort(students.filter(s => s.gender !== "Male"));
+
+    // Store for save/print
+    this._regClassId = classId;
+    this._regBoys    = boys;
+    this._regGirls   = girls;
+
+    document.getElementById("reg-print-btn").style.display = "";
+    document.getElementById("reg-save-btn").style.display  = "";
+
+    const canEdit = this.userProfile?.role === "principal" || this.userProfile?.permissions?.manageStudents;
+
+    const buildTable = (list, gender, color, icon) => {
+      if (!list.length) return `<p style="color:var(--text-muted);font-size:.85rem;padding:.75rem;">No ${gender.toLowerCase()} students in this class.</p>`;
+      return `
+        <div style="overflow-x:auto;">
+          <table style="width:100%;border-collapse:collapse;font-size:.85rem;">
+            <thead>
+              <tr style="background:rgba(255,255,255,.05);">
+                <th style="padding:.55rem .75rem;text-align:center;color:var(--text-muted);font-size:.73rem;text-transform:uppercase;letter-spacing:.05em;border-bottom:1px solid var(--glass-border);width:48px;">#</th>
+                <th style="padding:.55rem .75rem;text-align:left;color:var(--text-muted);font-size:.73rem;text-transform:uppercase;letter-spacing:.05em;border-bottom:1px solid var(--glass-border);">Name</th>
+                <th style="padding:.55rem .75rem;text-align:center;color:var(--text-muted);font-size:.73rem;text-transform:uppercase;letter-spacing:.05em;border-bottom:1px solid var(--glass-border);">Index No.</th>
+                ${canEdit ? `<th style="padding:.55rem .75rem;text-align:center;color:var(--text-muted);font-size:.73rem;text-transform:uppercase;letter-spacing:.05em;border-bottom:1px solid var(--glass-border);width:80px;">Order</th>` : ""}
+              </tr>
+            </thead>
+            <tbody id="reg-tbody-${gender.toLowerCase()}">
+              ${list.map((s,i) => `
+                <tr id="reg-row-${gender.toLowerCase()}-${i}" data-id="${s.id}" data-gender="${gender.toLowerCase()}"
+                  style="border-bottom:1px solid rgba(255,255,255,.04);transition:background .2s;">
+                  <td style="padding:.6rem .75rem;text-align:center;">
+                    <span style="font-size:.82rem;font-weight:800;color:${color};background:rgba(255,255,255,.06);border-radius:6px;padding:.15rem .45rem;">${i+1}</span>
+                  </td>
+                  <td style="padding:.6rem .75rem;">
+                    <div style="font-weight:700;font-size:.87rem;">${s.name||"—"}</div>
+                    ${s.dob?`<div style="font-size:.72rem;color:var(--text-muted);">${s.dob}</div>`:""}
+                  </td>
+                  <td style="padding:.6rem .75rem;text-align:center;color:var(--text-muted);font-size:.82rem;">${s.indexNo||"—"}</td>
+                  ${canEdit ? `
+                  <td style="padding:.45rem .75rem;text-align:center;">
+                    <div style="display:flex;gap:.25rem;justify-content:center;">
+                      <button onclick="APP.moveRegisterRow('${gender.toLowerCase()}',${i},-1)"
+                        style="background:rgba(255,255,255,.08);border:1px solid var(--glass-border);color:var(--text-main);width:28px;height:28px;border-radius:6px;cursor:pointer;font-size:.75rem;display:flex;align-items:center;justify-content:center;transition:all .2s;"
+                        ${i===0?"disabled style='opacity:.3;cursor:not-allowed;background:rgba(255,255,255,.08);border:1px solid var(--glass-border);color:var(--text-main);width:28px;height:28px;border-radius:6px;font-size:.75rem;display:flex;align-items:center;justify-content:center;'":""}
+                        title="Move Up"><i class="fas fa-chevron-up"></i></button>
+                      <button onclick="APP.moveRegisterRow('${gender.toLowerCase()}',${i},1)"
+                        style="background:rgba(255,255,255,.08);border:1px solid var(--glass-border);color:var(--text-main);width:28px;height:28px;border-radius:6px;cursor:pointer;font-size:.75rem;display:flex;align-items:center;justify-content:center;transition:all .2s;"
+                        ${i===list.length-1?"disabled style='opacity:.3;cursor:not-allowed;background:rgba(255,255,255,.08);border:1px solid var(--glass-border);color:var(--text-main);width:28px;height:28px;border-radius:6px;font-size:.75rem;display:flex;align-items:center;justify-content:center;'":""}
+                        title="Move Down"><i class="fas fa-chevron-down"></i></button>
+                    </div>
+                  </td>` : ""}
+                </tr>`).join("")}
+            </tbody>
+          </table>
+        </div>`;
+    };
+
+    rc.innerHTML = `
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:1.25rem;margin-top:.5rem;">
+
+        <!-- BOYS -->
+        <div class="glass card" style="border-color:rgba(56,189,248,.25);">
+          <div style="display:flex;align-items:center;gap:.65rem;margin-bottom:1rem;">
+            <div style="width:36px;height:36px;border-radius:10px;background:linear-gradient(135deg,#0ea5e9,#38bdf8);display:flex;align-items:center;justify-content:center;font-size:1rem;">
+              <i class="fas fa-mars" style="color:#fff;"></i>
+            </div>
+            <div>
+              <h3 style="font-size:.95rem;font-weight:800;color:#38bdf8;">Boys Register</h3>
+              <p style="font-size:.75rem;color:var(--text-muted);">${boys.length} students</p>
+            </div>
+            <span style="margin-left:auto;font-size:.75rem;background:rgba(56,189,248,.15);color:#38bdf8;border:1px solid rgba(56,189,248,.3);padding:.2rem .65rem;border-radius:999px;font-weight:700;">${boys.length}</span>
+          </div>
+          ${buildTable(boys, "Male", "#38bdf8", "fas fa-mars")}
+        </div>
+
+        <!-- GIRLS -->
+        <div class="glass card" style="border-color:rgba(244,114,182,.25);">
+          <div style="display:flex;align-items:center;gap:.65rem;margin-bottom:1rem;">
+            <div style="width:36px;height:36px;border-radius:10px;background:linear-gradient(135deg,#ec4899,#f472b6);display:flex;align-items:center;justify-content:center;font-size:1rem;">
+              <i class="fas fa-venus" style="color:#fff;"></i>
+            </div>
+            <div>
+              <h3 style="font-size:.95rem;font-weight:800;color:#f472b6;">Girls Register</h3>
+              <p style="font-size:.75rem;color:var(--text-muted);">${girls.length} students</p>
+            </div>
+            <span style="margin-left:auto;font-size:.75rem;background:rgba(244,114,182,.15);color:#f472b6;border:1px solid rgba(244,114,182,.3);padding:.2rem .65rem;border-radius:999px;font-weight:700;">${girls.length}</span>
+          </div>
+          ${buildTable(girls, "Female", "#f472b6", "fas fa-venus")}
+        </div>
+      </div>
+      ${canEdit ? `<p style="font-size:.78rem;color:var(--text-muted);margin-top:.75rem;text-align:center;"><i class="fas fa-info-circle"></i> Use ▲ ▼ buttons to reorder students, then click <strong>Save Order</strong> to persist changes.</p>` : ""}`;
+  },
+
+  moveRegisterRow(gender, index, direction) {
+    const arr = gender === "male" ? this._regBoys : this._regGirls;
+    const newIndex = index + direction;
+    if (newIndex < 0 || newIndex >= arr.length) return;
+    // Swap
+    [arr[index], arr[newIndex]] = [arr[newIndex], arr[index]];
+    if (gender === "male") this._regBoys = arr; else this._regGirls = arr;
+    // Re-render only the register section (not full page)
+    const classId = this._regClassId;
+    const canEdit = this.userProfile?.role === "principal" || this.userProfile?.permissions?.manageStudents;
+    const color = gender === "male" ? "#38bdf8" : "#f472b6";
+    const tbodyId = `reg-tbody-${gender}`;
+    const tbody = document.getElementById(tbodyId);
+    if (!tbody) return;
+    tbody.innerHTML = arr.map((s,i) => `
+      <tr id="reg-row-${gender}-${i}" data-id="${s.id}" data-gender="${gender}"
+        style="border-bottom:1px solid rgba(255,255,255,.04);transition:background .2s;">
+        <td style="padding:.6rem .75rem;text-align:center;">
+          <span style="font-size:.82rem;font-weight:800;color:${color};background:rgba(255,255,255,.06);border-radius:6px;padding:.15rem .45rem;">${i+1}</span>
+        </td>
+        <td style="padding:.6rem .75rem;">
+          <div style="font-weight:700;font-size:.87rem;">${s.name||"—"}</div>
+          ${s.dob?`<div style="font-size:.72rem;color:var(--text-muted);">${s.dob}</div>`:""}
+        </td>
+        <td style="padding:.6rem .75rem;text-align:center;color:var(--text-muted);font-size:.82rem;">${s.indexNo||"—"}</td>
+        ${canEdit ? `
+        <td style="padding:.45rem .75rem;text-align:center;">
+          <div style="display:flex;gap:.25rem;justify-content:center;">
+            <button onclick="APP.moveRegisterRow('${gender}',${i},-1)"
+              ${i===0?"disabled":""}
+              style="background:rgba(255,255,255,.08);border:1px solid var(--glass-border);color:${i===0?"rgba(255,255,255,.2)":"var(--text-main)"};width:28px;height:28px;border-radius:6px;cursor:${i===0?"not-allowed":"pointer"};font-size:.75rem;display:flex;align-items:center;justify-content:center;transition:all .2s;"
+              title="Move Up"><i class="fas fa-chevron-up"></i></button>
+            <button onclick="APP.moveRegisterRow('${gender}',${i},1)"
+              ${i===arr.length-1?"disabled":""}
+              style="background:rgba(255,255,255,.08);border:1px solid var(--glass-border);color:${i===arr.length-1?"rgba(255,255,255,.2)":"var(--text-main)"};width:28px;height:28px;border-radius:6px;cursor:${i===arr.length-1?"not-allowed":"pointer"};font-size:.75rem;display:flex;align-items:center;justify-content:center;transition:all .2s;"
+              title="Move Down"><i class="fas fa-chevron-down"></i></button>
+          </div>
+        </td>` : ""}
+      </tr>`).join("");
+    // Flash the moved row
+    const movedRow = document.getElementById(`reg-row-${gender}-${newIndex}`);
+    if (movedRow) {
+      movedRow.style.background = "rgba(59,130,246,.18)";
+      setTimeout(() => { movedRow.style.background = ""; }, 500);
+    }
+  },
+
+  async saveRegisterOrder() {
+    const { db, doc, updateDoc } = window.FB;
+    const boys  = this._regBoys  || [];
+    const girls = this._regGirls || [];
+    const all   = [...boys, ...girls];
+    if (!all.length) { this.toast("Nothing to save","warning"); return; }
+
+    this.toast("Saving order...","info");
+    try {
+      await Promise.all(all.map((s, i) => {
+        // Boys get order 1..n, Girls get n+1..n+m
+        const order = s.gender === "Male"
+          ? boys.findIndex(b=>b.id===s.id)
+          : girls.findIndex(g=>g.id===s.id);
+        return updateDoc(doc(db,"students",s.id), { registerOrder: order });
+      }));
+      this.toast("Register order saved!", "success");
+    } catch(e) { this.toast("Save failed: "+e.message,"error"); }
+  },
+
+  printClassRegister() {
+    const boys  = this._regBoys  || [];
+    const girls = this._regGirls || [];
+    const classId = this._regClassId || "—";
+
+    const buildPrintTable = (list, label, color) => `
+      <h3 style="color:${color};margin:1.25rem 0 .5rem;font-size:1rem;">${label} (${list.length})</h3>
+      <table>
+        <thead><tr><th>#</th><th>Name</th><th>Index No.</th><th>Date of Birth</th><th>Signature</th></tr></thead>
+        <tbody>
+          ${list.map((s,i)=>`<tr><td>${i+1}</td><td>${s.name||"—"}</td><td>${s.indexNo||"—"}</td><td>${s.dob||"—"}</td><td></td></tr>`).join("")}
+        </tbody>
+      </table>`;
+
+    const w = window.open("","_blank");
+    w.document.write(`<!DOCTYPE html><html><head><title>Class Register — ${classId}</title>
+      <style>
+        body{font-family:Arial,sans-serif;padding:2rem;color:#111;}
+        h2{font-size:1.3rem;margin-bottom:.25rem;}
+        .subtitle{color:#555;font-size:.85rem;margin-bottom:1rem;}
+        table{width:100%;border-collapse:collapse;margin-bottom:1rem;}
+        th,td{border:1px solid #ccc;padding:.45rem .65rem;font-size:.82rem;}
+        th{background:#1a3a8f;color:#fff;text-align:left;}
+        tr:nth-child(even){background:#f5f8ff;}
+        .boys-head{color:#0284c7;} .girls-head{color:#db2777;}
+        @media print{button{display:none;}}
+      </style></head>
+      <body>
+        <h2>BD/Hindu College Welimada — Class Register</h2>
+        <div class="subtitle">Class: <strong>${classId}</strong> &nbsp;|&nbsp; Printed: ${new Date().toLocaleDateString("en-GB", {weekday:"long",day:"2-digit",month:"long",year:"numeric"})}</div>
+        ${buildPrintTable(boys,  "👦 Boys Register",  "#0284c7")}
+        ${buildPrintTable(girls, "👧 Girls Register", "#db2777")}
+        <script>window.print();<\/script>
+      </body></html>`);
+    w.document.close();
+  },
+
 }; // end APP
 
 // ── Keyboard shortcut: Ctrl+K → Global Search ──────────────────────
@@ -2776,4 +3043,3 @@ document.addEventListener("keydown", e => {
 </script>
 </body>
 </html>
-
