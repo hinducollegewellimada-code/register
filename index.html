@@ -54,36 +54,25 @@
 </script>
  
 <!-- ============================================================
-     LOCAL AUTH SYSTEM  (no Firebase Auth — no billing)
-     Login credentials stored in localStorage.
-     Default principal: principal@whc.lk / principal@1221
+     AUTH SYSTEM
+     Login credentials now come ONLY from the shared "Teacher /
+     Staff Management System" (Login.html), which writes staff
+     accounts into the SAME Firestore project/collection
+     ("whc_staff"). This file no longer creates or edits teacher
+     accounts — it only reads them at login time.
+     A single hardcoded fallback principal login remains, in case
+     no staff records exist yet:  principal@whc.lk / principal@1221
      ============================================================ -->
 <script>
-  // ── Default principal credentials (editable from Settings) ────────
   const DEFAULT_PRINCIPAL = {
     username: "principal@whc.lk",
     password: "principal@1221",
     name: "Principal",
     role: "principal"
   };
- 
+  const STAFF_COLLECTION = "whc_staff"; // must match Login.html's STAFF_COL
+
   window.AUTH = {
-    // Returns stored principal creds or defaults
-    getPrincipal() {
-      const stored = localStorage.getItem("whc_principal");
-      return stored ? JSON.parse(stored) : { ...DEFAULT_PRINCIPAL };
-    },
-    savePrincipal(data) {
-      localStorage.setItem("whc_principal", JSON.stringify(data));
-    },
-    // Teacher accounts list
-    getTeachers() {
-      const stored = localStorage.getItem("whc_teachers");
-      return stored ? JSON.parse(stored) : [];
-    },
-    saveTeachers(list) {
-      localStorage.setItem("whc_teachers", JSON.stringify(list));
-    },
     // Session
     getSession() {
       const s = sessionStorage.getItem("whc_session");
@@ -95,23 +84,93 @@
     clearSession() {
       sessionStorage.removeItem("whc_session");
     },
-    // Login check
-    login(username, password) {
-      const principal = this.getPrincipal();
-      if (username === principal.username && password === principal.password) {
-        const user = { id: "principal", role: "principal", name: principal.name, email: username };
+
+    // Turns "Grade 11" -> "grade11" to match the classId format
+    // used for the classes/students collections in this app.
+    normalizeClassId(name) {
+      return (name || "").toString().trim().replace(/\s+/g, "").toLowerCase();
+    },
+
+    // Default permission sets. Teachers only get day-to-day
+    // attendance/register access for their own class; every other
+    // staff role (principal, deputy/vice principal, sectional head)
+    // gets full admin-level access.
+    buildPermissions(staffRole) {
+      if (staffRole === "teacher") {
+        return { markAttendance: true, editAttendance: false, manageStudents: false, viewHistory: true, viewReports: false };
+      }
+      return { markAttendance: true, editAttendance: true, manageStudents: true, viewHistory: true, viewReports: true };
+    },
+
+    // Login check — queries the shared staff database (Firestore)
+    // that Login.html writes to. Falls back to the hardcoded
+    // principal login only if no matching staff record is found.
+    async login(username, password) {
+      if (username === DEFAULT_PRINCIPAL.username && password === DEFAULT_PRINCIPAL.password) {
+        const user = {
+          id: "principal-default", role: "principal", staffRole: "principal",
+          name: DEFAULT_PRINCIPAL.name, email: username,
+          assignedClasses: [], permissions: this.buildPermissions("principal")
+        };
         this.setSession(user);
         return user;
       }
-      const teachers = this.getTeachers();
-      const teacher = teachers.find(t => t.username === username && t.password === password);
-      if (teacher) {
-        const user = { id: teacher.id, role: "teacher", name: teacher.name, email: teacher.username,
-          permissions: teacher.permissions || {}, assignedClasses: teacher.assignedClasses || [] };
+
+      try {
+        const { db, collection, getDocs, query, where } = window.FB;
+        const snap = await getDocs(query(collection(db, STAFF_COLLECTION), where("username", "==", username)));
+        let staff = null;
+        snap.forEach(d => {
+          const data = d.data();
+          if (data.password === password) staff = { id: d.id, ...data };
+        });
+        if (!staff) return null;
+
+        const isTeacher = staff.role === "teacher";
+        let assignedClasses = [];
+        let classSetupIssue = null;
+
+        if (isTeacher && staff.className) {
+          const wanted = this.normalizeClassId(staff.className);
+          let foundId = null;
+          try {
+            const classesSnap = await getDocs(collection(db, "classes"));
+            classesSnap.forEach(d => {
+              if (foundId) return;
+              const data = d.data();
+              // Match against the class's stored name OR its doc id —
+              // whichever the class was actually created with.
+              if (this.normalizeClassId(data.name) === wanted || this.normalizeClassId(d.id) === wanted) {
+                foundId = d.id;
+              }
+            });
+          } catch (e) { /* classes read failed — leave foundId null */ }
+
+          if (foundId) {
+            assignedClasses = [foundId];
+          } else {
+            // No matching class exists yet in Class Management.
+            // Keep the raw name so the UI can show exactly what to fix.
+            classSetupIssue = staff.className;
+          }
+        }
+
+        const user = {
+          id: staff.id,
+          role: isTeacher ? "teacher" : "principal", // non-teacher staff get full/admin-level access in this app
+          staffRole: staff.role || "teacher",
+          name: staff.name || username,
+          email: username,
+          assignedClasses,
+          classSetupIssue,
+          permissions: this.buildPermissions(staff.role)
+        };
         this.setSession(user);
         return user;
+      } catch (e) {
+        console.error("Staff login lookup failed:", e);
+        return null;
       }
-      return null;
     }
   };
 </script>
@@ -963,8 +1022,8 @@ const APP = {
     const session = window.AUTH.getSession();
     if (session) {
       this.currentUser = session;
-      this.userProfile = { role: session.role, name: session.name, email: session.email,
-        permissions: session.permissions || {}, assignedClasses: session.assignedClasses || [] };
+      this.userProfile = { role: session.role, staffRole: session.staffRole, name: session.name, email: session.email,
+        permissions: session.permissions || {}, assignedClasses: session.assignedClasses || [], classSetupIssue: session.classSetupIssue || null };
       this.showApp();
     } else {
       this.showLogin();
@@ -984,21 +1043,24 @@ const APP = {
     }
   },
  
-  login() {
+  async login() {
     const username = document.getElementById("login-email").value.trim();
     const pass     = document.getElementById("login-password").value;
     const errBox   = document.getElementById("login-error");
     const errMsg   = document.getElementById("login-error-msg");
+    const btn      = document.querySelector(".login-btn");
     errBox.style.display = "none";
     if (!username || !pass) {
       errMsg.textContent = "Please enter username and password.";
       errBox.style.display = "block"; return;
     }
-    const user = window.AUTH.login(username, pass);
+    if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Signing in...'; }
+    const user = await window.AUTH.login(username, pass);
+    if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-sign-in-alt"></i> Sign In'; }
     if (user) {
       this.currentUser = user;
-      this.userProfile = { role: user.role, name: user.name, email: user.email,
-        permissions: user.permissions || {}, assignedClasses: user.assignedClasses || [] };
+      this.userProfile = { role: user.role, staffRole: user.staffRole, name: user.name, email: user.email,
+        permissions: user.permissions || {}, assignedClasses: user.assignedClasses || [], classSetupIssue: user.classSetupIssue || null };
       this.toast("Welcome back, " + user.name + "!", "success");
       this.showApp();
     } else {
@@ -1483,11 +1545,20 @@ const APP = {
     }
  
     const classOptions = classes.map(c => `<option value="${c.id}">${c.name}</option>`).join("");
- 
+    const setupIssue = this.userProfile?.classSetupIssue;
+
     pc.innerHTML = `
       <div class="section-header">
         <h2><i class="fas fa-check-square" style="color:var(--blue-accent);margin-right:.5rem;"></i>Mark Attendance</h2>
       </div>
+      ${setupIssue ? `
+      <div class="glass card" style="margin-bottom:1rem;padding:.9rem 1.25rem;background:rgba(239,68,68,.08);border-color:rgba(239,68,68,.25);">
+        <i class="fas fa-exclamation-triangle" style="color:var(--danger);"></i>
+        <span style="font-size:.85rem;color:var(--text-muted);">
+          Your account is set to class <strong style="color:var(--text-main);">"${setupIssue}"</strong> in the Teacher Management System, but no class with that exact name exists in <strong style="color:var(--text-main);">Class Management</strong> yet.
+          Ask the principal to either add a class named exactly <strong style="color:var(--text-main);">"${setupIssue}"</strong>, or update your class in Login.html to match an existing class name.
+        </span>
+      </div>` : ""}
       <div class="glass card mb-4">
         <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:1rem;align-items:flex-end;">
           <div class="input-group" style="margin-bottom:0;">
@@ -2220,175 +2291,51 @@ const APP = {
   },
  
   // ── TEACHERS ───────────────────────────────────────────────────
+  // Teacher/staff accounts are no longer created or edited from this
+  // app — they live in the shared "Teacher Management System"
+  // (Login.html), which writes to the same Firestore project in the
+  // "whc_staff" collection. This panel is read-only: it just shows
+  // who exists so the principal can see who can log in, and links
+  // out to Login.html to add/edit/remove accounts.
   async renderTeachers() {
     const pc = document.getElementById("page-content");
-    const teachers = window.AUTH.getTeachers();
- 
+    const { db, collection, getDocs } = window.FB;
+    let staff = [];
+    try {
+      const snap = await getDocs(collection(db, "whc_staff"));
+      snap.forEach(d => staff.push({ id: d.id, ...d.data() }));
+    } catch (e) {}
+
+    const roleLabels = { principal:"Principal", deputy_principal:"Deputy Principal", vice_principal:"Vice Principal", sectional_head:"Sectional Head", teacher:"Teacher" };
+
     pc.innerHTML = `
       <div class="section-header">
-        <h2>Teacher Accounts (${teachers.length})</h2>
-        <button class="btn btn-primary btn-sm" onclick="APP.showAddTeacherModal()"><i class="fas fa-plus"></i> Add Teacher</button>
+        <h2>Teacher / Staff Accounts (${staff.length})</h2>
+        <a href="Login.html" target="_blank" class="btn btn-primary btn-sm" style="text-decoration:none;">
+          <i class="fas fa-external-link-alt"></i> Manage in Teacher Management System
+        </a>
       </div>
       <div class="glass card" style="margin-bottom:1rem;padding:.9rem 1.25rem;display:flex;gap:.5rem;align-items:center;background:rgba(37,99,235,.08);border-color:rgba(37,99,235,.2);">
         <i class="fas fa-info-circle" style="color:var(--blue-accent);"></i>
-        <span style="font-size:.82rem;color:var(--text-muted);">Teacher accounts are managed here. Passwords are stored locally in the browser. Teachers log in using their <strong style="color:var(--text-main);">username & password</strong> set below.</span>
+        <span style="font-size:.82rem;color:var(--text-muted);">Accounts can no longer be added or edited here. Use <strong style="color:var(--text-main);">Login.html (Teacher Management System)</strong> to add, edit, or remove staff — this app reads the same database and logs people in with the username &amp; password set there. A teacher assigned to a class (e.g. Grade 11) can only mark attendance and view the class register for that class.</span>
       </div>
       <div class="glass card">
         <div class="table-wrapper">
           <table>
-            <thead><tr><th>Name</th><th>Username</th><th>Assigned Classes</th><th>Permissions</th><th>Actions</th></tr></thead>
+            <thead><tr><th>Name</th><th>Role</th><th>Username</th><th>Class</th><th>Subject</th></tr></thead>
             <tbody>
-              ${teachers.length ? teachers.map(t => `
+              ${staff.length ? staff.map(s => `
                 <tr>
-                  <td><strong>${t.name||"—"}</strong></td>
-                  <td><code style="font-size:.8rem;color:var(--sky);">${t.username||"—"}</code></td>
-                  <td>${(t.assignedClasses||[]).join(", ")||"None"}</td>
-                  <td>${Object.entries(t.permissions||{}).filter(([,v])=>v).map(([k])=>`<span class="badge badge-teacher" style="margin:.1rem;">${k}</span>`).join("")||"—"}</td>
-                  <td class="td-actions">
-                    <button class="btn btn-sm btn-outline" onclick="APP.showEditTeacherModal('${t.id}')"><i class="fas fa-edit"></i></button>
-                    <button class="btn btn-sm btn-danger"  onclick="APP.deleteTeacher('${t.id}')"><i class="fas fa-trash"></i></button>
-                  </td>
-                </tr>`).join("") : `<tr><td colspan="5" class="text-center" style="padding:2rem;color:var(--text-muted);">No teacher accounts created yet. Click <strong>Add Teacher</strong> to create one.</td></tr>`}
+                  <td><strong>${s.name||"—"}</strong></td>
+                  <td>${roleLabels[s.role]||s.role||"—"}</td>
+                  <td><code style="font-size:.8rem;color:var(--sky);">${s.username||"—"}</code></td>
+                  <td>${s.className||"—"}</td>
+                  <td>${s.subject||"—"}</td>
+                </tr>`).join("") : `<tr><td colspan="5" class="text-center" style="padding:2rem;color:var(--text-muted);">No staff accounts yet. Open <strong>Login.html</strong> to create one.</td></tr>`}
             </tbody>
           </table>
         </div>
       </div>`;
-  },
- 
-  async showAddTeacherModal() {
-    const { db, collection, getDocs } = window.FB;
-    let classes = [];
-    try { const s=await getDocs(collection(db,"classes")); s.forEach(d=>classes.push({id:d.id,...d.data()})); } catch(e) {}
- 
-    const clsChecks = classes.map(c=>`
-      <label class="perm-item">
-        <input type="checkbox" class="tc-class" value="${c.id}"> ${c.name}
-      </label>`).join("");
- 
-    this.modal("Add Teacher Account", `
-      <div class="input-group"><label>Display Name *</label><input type="text" class="form-control" id="nt-name" placeholder="Mr. / Ms. Full Name"/></div>
-      <div class="input-group"><label>Username (for login) *</label><input type="text" class="form-control" id="nt-email" placeholder="e.g. teacher@whc.lk"/></div>
-      <div class="input-group"><label>Password *</label>
-        <div style="position:relative;">
-          <input type="password" class="form-control" id="nt-pass" placeholder="Set a password" style="padding-right:2.8rem;"/>
-          <button onclick="var i=document.getElementById('nt-pass');i.type=i.type==='password'?'text':'password';" style="position:absolute;right:.75rem;top:50%;transform:translateY(-50%);background:none;border:none;color:var(--text-muted);cursor:pointer;"><i class="fas fa-eye"></i></button>
-        </div>
-      </div>
-      <div class="input-group"><label>Assigned Classes</label>
-        <div class="perm-grid">${clsChecks||"<p style='color:var(--text-muted);font-size:.82rem;'>No classes created yet</p>"}</div>
-      </div>
-      <div class="input-group"><label>Permissions</label>
-        <div class="perm-grid">
-          <label class="perm-item"><input type="checkbox" id="pp-markAtt" checked> Mark Attendance</label>
-          <label class="perm-item"><input type="checkbox" id="pp-editAtt"> Edit Attendance</label>
-          <label class="perm-item"><input type="checkbox" id="pp-manageStudents"> Manage Students</label>
-          <label class="perm-item"><input type="checkbox" id="pp-viewHistory" checked> View History</label>
-          <label class="perm-item"><input type="checkbox" id="pp-viewReports"> View Reports</label>
-        </div>
-      </div>`,
-      `<button class="btn btn-outline" onclick="APP.closeModal()">Cancel</button>
-       <button class="btn btn-primary" onclick="APP.saveNewTeacher()"><i class="fas fa-save"></i> Save Teacher</button>`
-    );
-  },
- 
-  async saveNewTeacher() {
-    const name  = document.getElementById("nt-name")?.value.trim();
-    const email = document.getElementById("nt-email")?.value.trim();
-    const pass  = document.getElementById("nt-pass")?.value;
-    if (!name||!email||!pass) { this.toast("Name, username, and password are required","warning"); return; }
- 
-    const assignedClasses = [...document.querySelectorAll(".tc-class:checked")].map(c=>c.value);
-    const permissions = {
-      markAttendance:  document.getElementById("pp-markAtt")?.checked||false,
-      editAttendance:  document.getElementById("pp-editAtt")?.checked||false,
-      manageStudents:  document.getElementById("pp-manageStudents")?.checked||false,
-      viewHistory:     document.getElementById("pp-viewHistory")?.checked||false,
-      viewReports:     document.getElementById("pp-viewReports")?.checked||false,
-    };
- 
-    const teachers = window.AUTH.getTeachers();
-    if (teachers.find(t => t.username === email)) { this.toast("Username already exists","warning"); return; }
-    const id = "t_" + Date.now();
-    teachers.push({ id, name, username: email, password: pass, role:"teacher", assignedClasses, permissions });
-    window.AUTH.saveTeachers(teachers);
-    this.toast("Teacher account created!","success");
-    this.closeModal();
-    this.renderTeachers();
-  },
- 
-  async showEditTeacherModal(id) {
-    const teachers = window.AUTH.getTeachers();
-    const t = teachers.find(x => x.id === id);
-    if (!t) { this.toast("Teacher not found","error"); return; }
- 
-    const { db, collection, getDocs } = window.FB;
-    let classes = [];
-    try { const s=await getDocs(collection(db,"classes")); s.forEach(d=>classes.push({id:d.id,...d.data()})); } catch(e) {}
-    const p = t.permissions||{};
-    const ac = t.assignedClasses||[];
- 
-    const clsChecks = classes.map(c=>`
-      <label class="perm-item">
-        <input type="checkbox" class="etc-class" value="${c.id}" ${ac.includes(c.id)?"checked":""}> ${c.name}
-      </label>`).join("");
- 
-    this.modal("Edit Teacher: "+t.name, `
-      <div class="input-group"><label>Display Name</label><input type="text" class="form-control" id="et-name" value="${t.name||""}"/></div>
-      <div class="input-group"><label>Username (login)</label><input type="text" class="form-control" id="et-email" value="${t.username||""}"/></div>
-      <div class="input-group"><label>New Password <span style="color:var(--text-muted);font-weight:400;">(leave blank to keep current)</span></label>
-        <input type="password" class="form-control" id="et-pass" placeholder="Enter new password to change"/>
-      </div>
-      <div class="input-group"><label>Assigned Classes</label>
-        <div class="perm-grid">${clsChecks||"<p style='color:var(--text-muted);font-size:.82rem;'>No classes created yet</p>"}</div>
-      </div>
-      <div class="input-group"><label>Permissions</label>
-        <div class="perm-grid">
-          <label class="perm-item"><input type="checkbox" id="ep-markAtt" ${p.markAttendance?"checked":""}> Mark Attendance</label>
-          <label class="perm-item"><input type="checkbox" id="ep-editAtt" ${p.editAttendance?"checked":""}> Edit Attendance</label>
-          <label class="perm-item"><input type="checkbox" id="ep-manageStudents" ${p.manageStudents?"checked":""}> Manage Students</label>
-          <label class="perm-item"><input type="checkbox" id="ep-viewHistory" ${p.viewHistory?"checked":""}> View History</label>
-          <label class="perm-item"><input type="checkbox" id="ep-viewReports" ${p.viewReports?"checked":""}> View Reports</label>
-        </div>
-      </div>`,
-      `<button class="btn btn-outline" onclick="APP.closeModal()">Cancel</button>
-       <button class="btn btn-primary" onclick="APP.saveEditTeacher('${id}')"><i class="fas fa-save"></i> Save Changes</button>`
-    );
-  },
- 
-  async saveEditTeacher(id) {
-    const teachers = window.AUTH.getTeachers();
-    const idx = teachers.findIndex(x => x.id === id);
-    if (idx === -1) { this.toast("Teacher not found","error"); return; }
- 
-    const newPass = document.getElementById("et-pass")?.value;
-    const assignedClasses = [...document.querySelectorAll(".etc-class:checked")].map(c=>c.value);
-    const permissions = {
-      markAttendance:  document.getElementById("ep-markAtt")?.checked||false,
-      editAttendance:  document.getElementById("ep-editAtt")?.checked||false,
-      manageStudents:  document.getElementById("ep-manageStudents")?.checked||false,
-      viewHistory:     document.getElementById("ep-viewHistory")?.checked||false,
-      viewReports:     document.getElementById("ep-viewReports")?.checked||false,
-    };
- 
-    teachers[idx] = {
-      ...teachers[idx],
-      name: document.getElementById("et-name")?.value.trim() || teachers[idx].name,
-      username: document.getElementById("et-email")?.value.trim() || teachers[idx].username,
-      password: newPass || teachers[idx].password,
-      assignedClasses, permissions
-    };
-    window.AUTH.saveTeachers(teachers);
-    this.toast("Teacher updated!","success");
-    this.closeModal();
-    this.renderTeachers();
-  },
- 
-  async deleteTeacher(id) {
-    if (!confirm("Delete this teacher account? They will no longer be able to log in.")) return;
-    const teachers = window.AUTH.getTeachers().filter(t => t.id !== id);
-    window.AUTH.saveTeachers(teachers);
-    this.toast("Teacher removed","info");
-    this.renderTeachers();
   },
  
   // ── CLASSES ────────────────────────────────────────────────────
@@ -2482,22 +2429,14 @@ const APP = {
   renderSettings() {
     const pc = document.getElementById("page-content");
     const u = this.userProfile || {};
-    const principal = window.AUTH.getPrincipal();
     pc.innerHTML = `
       <div class="section-header"><h2>System Settings</h2></div>
       <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:1rem;">
  
         <div class="glass card">
-          <h3 style="font-size:.95rem;font-weight:800;margin-bottom:1rem;"><i class="fas fa-user-cog" style="color:var(--blue-accent);margin-right:.5rem;"></i>Principal Credentials</h3>
-          <div class="input-group"><label>Display Name</label><input type="text" class="form-control" id="set-name" value="${u.name||""}"/></div>
-          <div class="input-group"><label>Username (login)</label><input type="text" class="form-control" id="set-username" value="${principal.username||""}"/></div>
-          <div class="input-group"><label>New Password <span style="color:var(--text-muted);font-weight:400;">(leave blank to keep)</span></label>
-            <input type="password" class="form-control" id="set-newpass" placeholder="Enter new password to change"/>
-          </div>
-          <div class="input-group"><label>Confirm New Password</label>
-            <input type="password" class="form-control" id="set-newpass2" placeholder="Confirm new password"/>
-          </div>
-          <button class="btn btn-primary btn-sm" onclick="APP.saveProfileSettings()"><i class="fas fa-save"></i> Save Changes</button>
+          <h3 style="font-size:.95rem;font-weight:800;margin-bottom:1rem;"><i class="fas fa-user-cog" style="color:var(--blue-accent);margin-right:.5rem;"></i>Account &amp; Credentials</h3>
+          <p style="font-size:.82rem;color:var(--text-muted);margin-bottom:1rem;">Usernames and passwords for every account (principal, deputy/vice principal, sectional head, teachers) are managed in one place — the <strong style="color:var(--text-main);">Teacher Management System</strong>. This app only reads that database to sign people in.</p>
+          <a href="Login.html" target="_blank" class="btn btn-primary btn-sm" style="text-decoration:none;"><i class="fas fa-external-link-alt"></i> Open Teacher Management System</a>
         </div>
  
         <div class="glass card">
@@ -2537,32 +2476,6 @@ const APP = {
           </p>
         </div>
       </div>`;
-  },
- 
-  saveProfileSettings() {
-    const name     = document.getElementById("set-name")?.value.trim();
-    const username = document.getElementById("set-username")?.value.trim();
-    const newPass  = document.getElementById("set-newpass")?.value;
-    const newPass2 = document.getElementById("set-newpass2")?.value;
-    if (!name) { this.toast("Name required","warning"); return; }
-    if (!username) { this.toast("Username required","warning"); return; }
-    if (newPass && newPass !== newPass2) { this.toast("Passwords do not match","error"); return; }
- 
-    const principal = window.AUTH.getPrincipal();
-    principal.name     = name;
-    principal.username = username;
-    if (newPass) principal.password = newPass;
-    window.AUTH.savePrincipal(principal);
- 
-    // Update current session
-    this.userProfile.name = name;
-    this.currentUser.name = name;
-    this.currentUser.email = username;
-    window.AUTH.setSession(this.currentUser);
-    document.getElementById("sb-name").textContent = name;
-    document.getElementById("sb-avatar").textContent = name[0].toUpperCase();
-    this.toast("Credentials updated! Use new username/password next login.","success");
-    this.renderSettings();
   },
  
   async exportData() {
@@ -2888,9 +2801,11 @@ const APP = {
       const sSnap = await getDocs(collection(db,"students"));
       sSnap.forEach(d => { const s=d.data(); if((s.name||"").toLowerCase().includes(q)||(s.indexNo||"").toLowerCase().includes(q)) results.push({type:"student",id:d.id,...s}); });
     } catch(e) {}
-    // Search local teachers
-    const teachers = window.AUTH.getTeachers();
-    teachers.forEach(t => { if((t.name||"").toLowerCase().includes(q)) results.push({type:"teacher",id:t.id,name:t.name}); });
+    // Search staff (shared whc_staff collection)
+    try {
+      const tSnap = await getDocs(collection(db,"whc_staff"));
+      tSnap.forEach(d => { const t=d.data(); if((t.name||"").toLowerCase().includes(q)) results.push({type:"teacher",id:d.id,name:t.name}); });
+    } catch(e) {}
  
     if (!results.length) { out.innerHTML = `<p style="color:var(--text-muted);font-size:.85rem;text-align:center;">No results for "${val}"</p>`; return; }
  
@@ -2940,9 +2855,8 @@ service cloud.firestore {
 }</pre>
  
         <h4 style="color:var(--white);margin:1rem 0 .5rem;">Step 5 — Login Credentials</h4>
-        <p>Default principal login: <code style="color:var(--sky);">principal@whc.lk</code> / <code style="color:var(--sky);">principal@1221</code><br>
-        Change these anytime from <strong>Settings → Principal Credentials</strong>.<br>
-        Add teacher accounts from <strong>Teachers → Add Teacher</strong>.</p>
+        <p>Fallback principal login (works even with an empty database): <code style="color:var(--sky);">principal@whc.lk</code> / <code style="color:var(--sky);">principal@1221</code><br>
+        All staff/teacher accounts (including additional principals) are created in <strong>Login.html (Teacher Management System)</strong> — this app only reads that same Firestore database to log people in, it never creates accounts itself.</p>
  
         <h4 style="color:var(--white);margin:1rem 0 .5rem;">Deploy to GitHub Pages</h4>
         <p>Push this file to a GitHub repo → Settings → Pages → Deploy from main branch. Done!</p>
@@ -2966,6 +2880,28 @@ service cloud.firestore {
       return;
     }
  
+    // Restrict to the teacher's own class(es) — same rule as Mark Attendance.
+    const role = this.userProfile?.role;
+    const assigned = this.userProfile?.assignedClasses;
+    if (role !== "principal" && assigned) {
+      classes = classes.filter(c => assigned.includes(c.id));
+    }
+ 
+    if (role !== "principal" && (!assigned || !assigned.length || !classes.length)) {
+      const setupIssue = this.userProfile?.classSetupIssue;
+      pc.innerHTML = `
+        <div class="section-header"><h2><i class="fas fa-list-ol" style="color:var(--blue-accent);margin-right:.5rem;"></i>Class Register</h2></div>
+        <div class="glass card empty-state" style="margin-top:1rem;">
+          <i class="fas fa-exclamation-triangle" style="color:var(--warning);opacity:.7;"></i>
+          ${setupIssue
+            ? `<p style="color:var(--text-muted);">Your account is set to class <strong style="color:var(--text-main);">"${setupIssue}"</strong>, but no class with that exact name exists in <strong>Class Management</strong> yet.<br>
+               Ask the principal to add a class named exactly <strong style="color:var(--text-main);">"${setupIssue}"</strong>, or update your class in the Teacher Management System (Login.html) to match an existing class name.</p>`
+            : `<p style="color:var(--text-muted);">No class is set up for your account yet.<br>
+               Ask the principal to confirm your class exists in <strong>Class Management</strong> and matches what is set for you in the Teacher Management System (Login.html).</p>`}
+        </div>`;
+      return;
+    }
+ 
     const classOpts = classes.map(c=>`<option value="${c.id}">${c.name}</option>`).join("");
  
     pc.innerHTML = `
@@ -2973,7 +2909,7 @@ service cloud.firestore {
         <h2><i class="fas fa-list-ol" style="color:var(--blue-accent);margin-right:.5rem;"></i>Class Register</h2>
         <div class="flex gap-3 items-center" style="flex-wrap:wrap;">
           <select class="form-control" id="reg-class-sel" style="width:auto;padding:.5rem .9rem;font-size:.9rem;" onchange="APP.loadClassRegister(this.value)">
-            <option value="">— Select Class —</option>${classOpts}
+            ${role==="principal" ? '<option value="">— Select Class —</option>' : ""}${classOpts}
           </select>
           <button class="btn btn-outline btn-sm" id="reg-print-btn" style="display:none;" onclick="APP.printClassRegister()">
             <i class="fas fa-print"></i> Print Register
@@ -2989,7 +2925,14 @@ service cloud.firestore {
           <p>Select a class to view its register</p>
         </div>
       </div>`;
+ 
+    // Teachers only have one class — load it immediately instead of
+    // making them pick from a dropdown of one.
+    if (role !== "principal" && classes.length === 1) {
+      this.loadClassRegister(classes[0].id);
+    }
   },
+
  
   async loadClassRegister(classId) {
     if (!classId) return;
