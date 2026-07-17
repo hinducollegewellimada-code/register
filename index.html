@@ -1133,6 +1133,7 @@ const APP = {
       ]},
       { title: "People", items: [
         { panel:"students",  icon:"fas fa-user-graduate", label:"Students" },
+        { panel:"student-details", icon:"fas fa-id-card", label:"Student Details" },
         { panel:"teachers",  icon:"fas fa-chalkboard-teacher", label:"Teachers" },
       ]},
       { title: "System", items: [
@@ -1149,6 +1150,7 @@ const APP = {
     if (perms.viewHistory)   items.push({ panel:"att-history", icon:"fas fa-history", label:"History" });
     if (perms.manageStudents) items.push({ panel:"students",   icon:"fas fa-user-graduate", label:"Students" });
     if (perms.viewReports)   items.push({ panel:"att-reports", icon:"fas fa-file-alt", label:"Reports" });
+    items.push({ panel:"student-details", icon:"fas fa-id-card", label:"Student Details" });
     items.push({ panel:"class-register", icon:"fas fa-list-ol", label:"Class Register" });
     return [{ title: "Menu", items }];
   },
@@ -1163,7 +1165,8 @@ const APP = {
       "mark-attendance": "Mark Attendance", "att-history": "Attendance History",
       "att-reports": "Attendance Reports", students: "Student Profiles",
       teachers: "Teacher Management", classes: "Class Management",
-      settings: "System Settings", "class-register": "Class Register"
+      settings: "System Settings", "class-register": "Class Register",
+      "student-details": "Student Details"
     };
     document.getElementById("page-title").textContent = titles[panel] || panel;
     const pc = document.getElementById("page-content");
@@ -1179,6 +1182,7 @@ const APP = {
       classes: () => this.renderClasses(),
       settings: () => this.renderSettings(),
       "class-register": () => this.renderClassRegister(),
+      "student-details": () => this.renderStudentDetails(),
     };
     setTimeout(() => { if (methods[panel]) methods[panel](); else pc.innerHTML = `<p>Coming soon</p>`; }, 200);
     // close mobile
@@ -3152,6 +3156,277 @@ service cloud.firestore {
     w.document.close();
   },
  
+  // ================================================================
+  // STUDENT DETAILS (search by name / index no. — full profile:
+  // attendance + 1st/2nd/3rd term marks shown as grade letters,
+  // with rank & average. Covers Grade 1–11.)
+  // ================================================================
+  _sdYear: new Date().getFullYear() >= 2026 ? new Date().getFullYear() : 2026,
+
+  SD_SUBJECTS_9_11: ["Religion","Tamil","English","Maths","Science","History","B1","B2","B3"],
+  SD_SUBJECTS_1_8:  ["Religion","Tamil","Maths","Science","English","History","Civics","Art/Dance","PTS","Sinhala","ICT","Health","Geography"],
+
+  sdParseGradeNum(name) {
+    const m = String(name || "").match(/grade\s*(\d+)/i);
+    return m ? parseInt(m[1], 10) : null;
+  },
+  sdDefaultSubjects(className) {
+    const n = this.sdParseGradeNum(className);
+    if (n !== null && n >= 9) return this.SD_SUBJECTS_9_11;
+    return this.SD_SUBJECTS_1_8;
+  },
+  sdIsAbsent(v) { return String(v).trim().toLowerCase() === "ab"; },
+  sdGradeLetter(v) {
+    if (v === undefined || v === null || v === "") return "—";
+    if (this.sdIsAbsent(v)) return "Ab";
+    const n = parseFloat(v);
+    if (isNaN(n)) return "—";
+    if (n >= 75) return "A";
+    if (n >= 60) return "B";
+    if (n >= 45) return "C";
+    if (n > 35)  return "S";
+    return "W";
+  },
+  sdGradeColor(letter) {
+    return { A:"#10b981", B:"#38bdf8", C:"#f59e0b", S:"#f97316", W:"#ef4444", Ab:"#94a3b8", "—":"var(--text-muted)" }[letter] || "var(--text-muted)";
+  },
+
+  async renderStudentDetails() {
+    const pc = document.getElementById("page-content");
+    const restricted = this.userProfile?.role !== "principal" && this.userProfile?.assignedClasses?.length;
+    let restrictedClassNames = "";
+    if (restricted) {
+      if (!this._classNameCache) {
+        this._classNameCache = {};
+        try {
+          const { db, collection, getDocs } = window.FB;
+          const cSnap = await getDocs(collection(db, "classes"));
+          cSnap.forEach(d => { this._classNameCache[d.id] = d.data().name || d.id; });
+        } catch (e) {}
+      }
+      restrictedClassNames = this.userProfile.assignedClasses.map(cid => this._classNameCache[cid] || cid).join(", ");
+    }
+    pc.innerHTML = `
+      <div class="section-header"><h2><i class="fas fa-id-card"></i> Student Details</h2></div>
+      <div class="glass card" style="margin-bottom:1.25rem;">
+        <p style="font-size:.8rem;color:var(--text-muted);margin-bottom:.75rem;">
+          Search any student ${restricted ? `in your class` : `(Grade 1–11)`} by <strong>name</strong> or <strong>index number</strong> to view their
+          full profile — attendance record and 1st / 2nd / 3rd term mark details (shown as grades) with rank &amp; average.
+        </p>
+        ${restricted ? `<div class="badge badge-admin" style="margin-bottom:.75rem;"><i class="fas fa-lock"></i> Restricted to your class${this.userProfile.assignedClasses.length>1?"es":""}: ${restrictedClassNames}</div>` : ""}
+        <div style="display:flex;gap:.6rem;flex-wrap:wrap;align-items:flex-end;">
+          <div class="input-group" style="flex:1;min-width:220px;margin-bottom:0;">
+            <label>Search by Name / Index No.</label>
+            <input type="text" class="form-control" id="sd-search-input" placeholder="e.g. Kamal Perera or 1023"
+              onkeydown="if(event.key==='Enter') APP.searchStudentDetails();"/>
+          </div>
+          <div class="input-group" style="width:130px;margin-bottom:0;">
+            <label>Marks Year</label>
+            <input type="number" class="form-control" id="sd-year-input" value="${this._sdYear}"/>
+          </div>
+          <button class="btn btn-primary" onclick="APP.searchStudentDetails()"><i class="fas fa-search"></i> Search</button>
+        </div>
+      </div>
+      <div id="sd-results"></div>
+      <div id="sd-profile"></div>`;
+    document.getElementById("sd-search-input").focus();
+  },
+
+  async searchStudentDetails() {
+    const qv = (document.getElementById("sd-search-input")?.value || "").trim().toLowerCase();
+    const resultsEl = document.getElementById("sd-results");
+    document.getElementById("sd-profile").innerHTML = "";
+    if (!qv) { resultsEl.innerHTML = `<p style="color:var(--text-muted);font-size:.85rem;">Type a name or index number to search.</p>`; return; }
+
+    resultsEl.innerHTML = `<div style="display:flex;justify-content:center;padding:1.5rem;"><div class="loader-ring"></div></div>`;
+    const { db, collection, getDocs } = window.FB;
+    let students = [];
+    try {
+      const snap = await getDocs(collection(db, "students"));
+      snap.forEach(d => students.push({ id: d.id, ...d.data() }));
+    } catch (e) { resultsEl.innerHTML = `<p style="color:var(--danger);">Couldn't load students: ${e.message}</p>`; return; }
+
+    // Restrict to assigned classes for teachers who have a class assignment
+    const perms = this.userProfile?.permissions;
+    const restrictToClasses = this.userProfile?.role !== "principal" && this.userProfile?.assignedClasses?.length
+      ? this.userProfile.assignedClasses : null;
+    if (restrictToClasses) students = students.filter(s => restrictToClasses.includes(s.classId));
+
+    const matches = students.filter(s =>
+      (s.name || "").toLowerCase().includes(qv) || (s.indexNo || "").toString().toLowerCase().includes(qv)
+    );
+
+    if (!matches.length) { resultsEl.innerHTML = `<p style="color:var(--text-muted);font-size:.85rem;">No students found matching "${qv}".</p>`; return; }
+
+    resultsEl.innerHTML = `
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:.85rem;margin-bottom:1.25rem;">
+        ${matches.map(s => {
+          const initials = (s.name || "S").split(" ").map(n => n[0]).join("").toUpperCase().slice(0, 2);
+          return `
+          <div class="glass card" style="cursor:pointer;display:flex;align-items:center;gap:.75rem;" onclick="APP.openStudentDetailProfile('${s.id}')">
+            <div style="width:46px;height:46px;border-radius:12px;background:linear-gradient(135deg,var(--blue-light),var(--cyan));display:flex;align-items:center;justify-content:center;font-weight:800;color:#fff;flex-shrink:0;">
+              ${s.photo ? `<img src="${s.photo}" style="width:100%;height:100%;object-fit:cover;border-radius:12px;"/>` : initials}
+            </div>
+            <div style="min-width:0;">
+              <div style="font-weight:800;font-size:.9rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${s.name || "—"}</div>
+              <div style="font-size:.75rem;color:var(--text-muted);">#${s.indexNo || "—"} &middot; ${s.classId || "—"}</div>
+            </div>
+          </div>`;
+        }).join("")}
+      </div>`;
+  },
+
+  async openStudentDetailProfile(studentId) {
+    const profileEl = document.getElementById("sd-profile");
+    profileEl.innerHTML = `<div style="display:flex;justify-content:center;padding:2rem;"><div class="loader-ring"></div></div>`;
+    const { db, doc, getDoc, collection, query, where, getDocs } = window.FB;
+
+    let s = null;
+    try { const snap = await getDoc(doc(db, "students", studentId)); s = { id: studentId, ...snap.data() }; } catch (e) {}
+    if (!s || !s.name) { profileEl.innerHTML = `<p style="color:var(--danger);">Student not found.</p>`; return; }
+
+    // ── Attendance summary (last 30 days) ──
+    const ago30 = new Date(Date.now() - 30 * 86400000).toISOString().split("T")[0];
+    let present = 0, absent = 0, late = 0, medical = 0, records = [];
+    try {
+      const aSnap = await getDocs(query(collection(db, "attendance"), where("studentId", "==", studentId), where("date", ">=", ago30)));
+      aSnap.forEach(d => {
+        const r = d.data(); records.push(r);
+        if (r.status === "Present") present++;
+        else if (r.status === "Absent") absent++;
+        else if (r.status === "Late") late++;
+        else if (r.status === "Medical") medical++;
+      });
+      records.sort((a, b) => b.date.localeCompare(a.date));
+    } catch (e) {}
+    const totalAtt = present + absent + late + medical;
+    const pct = totalAtt ? Math.round((present / totalAtt) * 100) : 0;
+
+    // ── Class + subjects ──
+    let className = s.classId || "—";
+    let subjects = this.sdDefaultSubjects(className);
+    try {
+      const cSnap = await getDoc(doc(db, "classes", s.classId));
+      if (cSnap.exists()) {
+        const cd = cSnap.data();
+        className = cd.name || className;
+        if (Array.isArray(cd.subjects) && cd.subjects.length) subjects = cd.subjects;
+        else subjects = this.sdDefaultSubjects(cd.name);
+      }
+    } catch (e) {}
+
+    const year = document.getElementById("sd-year-input")?.value || this._sdYear;
+
+    // ── Marks for terms 1,2,3 ──
+    const termBlocks = [];
+    for (const term of ["1", "2", "3"]) {
+      const docId = `${s.classId}_${year}_t${term}`;
+      let subjectMarks = {}, rank = "—", avg = null, classSize = 0;
+      try {
+        const mSnap = await getDoc(doc(db, "whc_marks", docId));
+        if (mSnap.exists()) {
+          const allMarks = mSnap.data().marks || {};
+          subjectMarks = allMarks[studentId] || {};
+
+          // Rank & average across the whole class for this term
+          let classStudents = [];
+          try {
+            const csSnap = await getDocs(query(collection(db, "students"), where("classId", "==", s.classId)));
+            csSnap.forEach(d => classStudents.push(d.id));
+          } catch (e) {}
+          const withAvg = classStudents.map(sid => {
+            const m = allMarks[sid] || {};
+            let total = 0, cnt = 0;
+            subjects.forEach(sub => { const v = parseFloat(m[sub]); if (!isNaN(v)) { total += v; cnt++; } });
+            return { sid, avg: cnt > 0 ? total / cnt : null };
+          }).filter(x => x.avg !== null);
+          withAvg.sort((a, b) => b.avg - a.avg);
+          classSize = withAvg.length;
+          const myIdx = withAvg.findIndex(x => x.sid === studentId);
+          if (myIdx >= 0) { rank = myIdx + 1; avg = withAvg[myIdx].avg; }
+        }
+      } catch (e) {}
+
+      termBlocks.push({ term, subjectMarks, rank, avg, classSize });
+    }
+
+    const initials = (s.name || "S").split(" ").map(n => n[0]).join("").toUpperCase().slice(0, 2);
+    const termLabel = t => t === "1" ? "1st Term" : t === "2" ? "2nd Term" : "3rd Term";
+
+    profileEl.innerHTML = `
+      <div class="glass card" style="margin-bottom:1.25rem;">
+        <div style="display:flex;align-items:center;gap:1rem;flex-wrap:wrap;">
+          <div style="width:70px;height:70px;border-radius:18px;background:linear-gradient(135deg,var(--blue-light),var(--cyan));display:flex;align-items:center;justify-content:center;font-size:1.6rem;font-weight:800;color:#fff;flex-shrink:0;">
+            ${s.photo ? `<img src="${s.photo}" style="width:100%;height:100%;object-fit:cover;border-radius:18px;"/>` : initials}
+          </div>
+          <div style="flex:1;min-width:180px;">
+            <h3 style="font-size:1.15rem;font-weight:800;">${s.name || "—"}</h3>
+            <div style="display:flex;gap:.5rem;margin-top:.4rem;flex-wrap:wrap;">
+              <span class="badge ${s.gender === "Male" ? "badge-teacher" : "badge-admin"}">${s.gender || "—"}</span>
+              <span class="badge badge-admin">${className}</span>
+              <span class="badge badge-absent">#${s.indexNo || "—"}</span>
+            </div>
+          </div>
+          <button class="btn btn-outline btn-sm" onclick="APP.renderAttCalendar('${studentId}','${(s.name||"").replace(/'/g,"\\'")}')"><i class="fas fa-calendar"></i> Full Calendar</button>
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:.6rem;margin-top:1rem;font-size:.82rem;">
+          <div class="glass" style="padding:.65rem .85rem;border-radius:10px;"><div style="color:var(--text-muted);font-size:.7rem;font-weight:700;text-transform:uppercase;">Date of Birth</div><div style="font-weight:700;margin-top:.2rem;">${s.dob || "—"}</div></div>
+          <div class="glass" style="padding:.65rem .85rem;border-radius:10px;"><div style="color:var(--text-muted);font-size:.7rem;font-weight:700;text-transform:uppercase;">Admission</div><div style="font-weight:700;margin-top:.2rem;">${s.admDate || "—"}</div></div>
+          <div class="glass" style="padding:.65rem .85rem;border-radius:10px;"><div style="color:var(--text-muted);font-size:.7rem;font-weight:700;text-transform:uppercase;">Parent</div><div style="font-weight:700;margin-top:.2rem;">${s.parentName || "—"}</div></div>
+          <div class="glass" style="padding:.65rem .85rem;border-radius:10px;"><div style="color:var(--text-muted);font-size:.7rem;font-weight:700;text-transform:uppercase;">Phone</div><div style="font-weight:700;margin-top:.2rem;">${s.parentPhone || "—"}</div></div>
+        </div>
+      </div>
+
+      <div class="glass card" style="margin-bottom:1.25rem;">
+        <h4 style="font-size:.95rem;font-weight:800;margin-bottom:.75rem;"><i class="fas fa-calendar-check"></i> Attendance (last 30 days)</h4>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.5rem;">
+          <span style="font-size:.82rem;font-weight:700;">Attendance Rate</span>
+          <span style="font-weight:800;color:${pct >= 85 ? "var(--success)" : pct >= 70 ? "var(--warning)" : "var(--danger)"};">${pct}%</span>
+        </div>
+        <div class="progress-bar-wrap"><div class="progress-bar ${pct >= 85 ? "high" : pct >= 70 ? "medium" : "low"}" style="width:${pct}%"></div></div>
+        <div style="display:flex;gap:.5rem;margin-top:.6rem;flex-wrap:wrap;">
+          <span class="badge badge-present">✓ ${present} Present</span>
+          <span class="badge badge-absent">✗ ${absent} Absent</span>
+          <span class="badge badge-late">⏰ ${late} Late</span>
+          ${medical ? `<span class="badge badge-admin">🩺 ${medical} Medical</span>` : ""}
+        </div>
+      </div>
+
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:1rem;">
+        ${termBlocks.map(tb => `
+          <div class="glass card">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.75rem;">
+              <h4 style="font-size:.92rem;font-weight:800;"><i class="fas fa-book"></i> ${termLabel(tb.term)} — ${year}</h4>
+            </div>
+            <div style="display:flex;gap:.6rem;margin-bottom:.75rem;flex-wrap:wrap;">
+              <div class="glass" style="padding:.5rem .85rem;border-radius:10px;flex:1;min-width:100px;text-align:center;">
+                <div style="font-size:.68rem;color:var(--text-muted);font-weight:700;text-transform:uppercase;">Average</div>
+                <div style="font-weight:900;font-size:1.15rem;color:var(--sky);">${tb.avg !== null ? this.sdGradeLetter(tb.avg) : "—"}</div>
+              </div>
+              <div class="glass" style="padding:.5rem .85rem;border-radius:10px;flex:1;min-width:100px;text-align:center;">
+                <div style="font-size:.68rem;color:var(--text-muted);font-weight:700;text-transform:uppercase;">Rank</div>
+                <div style="font-weight:900;font-size:1.15rem;color:#f59e0b;">${tb.rank !== "—" ? (tb.rank === 1 ? "🥇 1" : tb.rank === 2 ? "🥈 2" : tb.rank === 3 ? "🥉 3" : tb.rank) : "—"}${tb.classSize ? ` <span style="font-size:.7rem;color:var(--text-muted);font-weight:600;">/ ${tb.classSize}</span>` : ""}</div>
+              </div>
+            </div>
+            <table style="width:100%;border-collapse:collapse;font-size:.82rem;">
+              <thead><tr style="border-bottom:1px solid var(--glass-border);">
+                <th style="text-align:left;padding:.4rem .3rem;color:var(--text-muted);">Subject</th>
+                <th style="text-align:center;padding:.4rem .3rem;color:var(--text-muted);">Grade</th>
+              </tr></thead>
+              <tbody>
+                ${subjects.map(sub => {
+                  const letter = this.sdGradeLetter(tb.subjectMarks[sub]);
+                  return `<tr style="border-bottom:1px solid rgba(255,255,255,.04);">
+                    <td style="padding:.4rem .3rem;">${sub}</td>
+                    <td style="padding:.4rem .3rem;text-align:center;font-weight:800;color:${this.sdGradeColor(letter)};">${letter}</td>
+                  </tr>`;
+                }).join("")}
+              </tbody>
+            </table>
+          </div>`).join("")}
+      </div>`;
+  },
+
 }; // end APP
  
 // ── Keyboard shortcut: Ctrl+K → Global Search ──────────────────────
